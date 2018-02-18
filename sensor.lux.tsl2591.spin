@@ -116,53 +116,96 @@ PUB SpecialFunc(func) | cmd_packet
   i2c.stop
 
 PUB Enable(NPIEN, SAI, AIEN, AEN, PON) | ena_byte
-' NPIEN 7
-' SAI 6
-' RES 5 (0)
-' AIEN 4
-' RES 3..2 (0)
-' AEN 1
-' PON 0
+'NPIEN  - No Persist Interrupt Enable
+'SAI    - Sleep After Interrupt
+'AIEN   - ALS Interrupt Enable
+'AEN    - ALS Enable
+'PON    - Power On
   ena_byte := ((NPIEN & 1) << 7) | ((SAI & 1) << 6) | ((AIEN & 1) << 4) | ((AEN & 1) << 1) | (PON & 1)
   Command (TSL_ENABLE)
   WriteByte (ena_byte)
 
+PUB GetState: state
+
+  Command (TSL_ENABLE)
+  ReadByte (@state)
+
+PUB GetNPIEN: npien
+
+  byte[npien] := (GetState >> 7) & 1
+
+PUB GetSAI: sai
+
+  byte[sai] := (GetState >> 6) & 1
+
+PUB GetAIEN: aien
+
+  byte[aien] := (GetState >> 4) & 1
+
+PUB GetAEN: aen
+
+  byte[aen] := (GetState >> 1) & 1
+
+PUB GetPON: pon
+
+  byte[pon] := GetState & 1
+
 PUB Control(SRESET, AGAIN, ATIME) | ctrl_byte
-' SRESET 7
-' RES 6 (0)
-' AGAIN 5..4
-' RES 3 (0)
-' ATIME 2..0
+'SRESET - System Reset (= POR)
+'AGAIN  - ALS Gain (%00: Low Gain, %01: Medium Gain, %10: High Gain, %11: Maximum Gain)
+'ATIME  - ALS Time/ADC Integration time (%000: 100ms, %001: 200ms, %010: 300ms, %011: 400ms, %100: 500ms, %101: 600ms)
+
   ctrl_byte := ((SRESET & 1) << 7) | ((AGAIN & 3) << 4) | (ATIME & 5)
   Command ( TSL_CONFIG)
   WriteByte (ctrl_byte)
 
-PUB SetALS_IntThresh(AILTL, AILTH, AIHTL, AIHTH) | als_long
+PUB GetControlReg: ctrl_reg
+
+  Command (TSL_CONFIG)
+  ReadByte (@ctrl_reg)
+
+PUB GetGain: gain
+
+  byte[gain] := (GetControlReg >> 4) & %11
+
+PUB GetATime: a_time
+'ADC Integration time (both channels)
+' Val   Int time  Max Count
+' %000  100ms     37888
+' %001  200ms     65535
+' %010  300ms     65535
+' %011  400ms     65535
+' %100  500ms     65535
+' %101  600ms     65535
+  byte[a_time] := GetControlReg & %111
+
+PUB SetALS_IntThresh(low_threshold_word, high_threshold_word) | als_long
 ' ALS: AILTL..AILTH low thresh, AIHTL..AIHTH high thresh
-  als_long := (AILTL << 24) | (AILTH << 16) | (AIHTL << 8) | AIHTH
+  if low_threshold_word < 0 or low_threshold_word > 65535 or high_threshold_word < 0 or high_threshold_word > 65535
+    return
+  als_long := (high_threshold_word << 16) | low_threshold_word
   Command (TSL_AILTL)
   WriteLong (als_long)
 
-PUB SetNPALS_IntThresh(NPAILTL, NPAILTH, NPAIHTL, NPAIHTH) | npals_long
+PUB GetALS_IntThresh: threshold | als_long
+' ALS: AILTL..AILTH low thresh, AIHTL..AIHTH high thresh
+  Command (TSL_AILTL)
+  ReadLong (@threshold)
+
+PUB SetNPALS_IntThresh(nopersist_low_threshold_word, nopersist_high_threshold_word) | npals_long
 ' NPALS: No-persist ALS
-  npals_long := (NPAILTL << 24) | (NPAILTH << 16) | (NPAIHTL << 8) | NPAIHTH
-  Command ( TSL_NPAILTL)
+  if nopersist_low_threshold_word < 0 or nopersist_low_threshold_word > 65535 or nopersist_high_threshold_word < 0 or nopersist_high_threshold_word > 65535
+    return
+  npals_long := (nopersist_high_threshold_word << 16) | nopersist_low_threshold_word
+  Command (TSL_NPAILTL)
   WriteLong (npals_long)
 
-PUB GetPersist(APERS)
-' RES 7..4 (0)
-' APERS 3..0:
-'   0000: Every ALS cycle gen int
-'   0001: Any val outside thresh
-'   0010: 2 consecutive values OOR
-'   0011: 3
-'   0100: 5
-'   ..  : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
-'   1111: 60
-  Command ( TSL_PERSIST)
-  ReadByte (@APERS) 'No bounds checking/clamping to lower 4 bits...should there be?
+PUB GetNPALS_IntThresh: threshold | npals_long
+' NPALS: No-persist ALS
+  Command ( TSL_NPAILTL)
+  ReadLong (@threshold)
 
-PUB SetPersist(APERS)
+PUB GetPersist(APERS): cycles
 ' RES 7..4 (0)
 ' APERS 3..0:
 '   0000: Every ALS cycle gen int
@@ -173,7 +216,21 @@ PUB SetPersist(APERS)
 '   ..  : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 '   1111: 60
   Command ( TSL_PERSIST)
-  WriteByte ((||APERS) <# $0F)  'Take absolute value and clamp to 15/$0F
+  ReadByte (@cycles) 'No bounds checking/clamping to lower 4 bits...should there be?
+
+PUB SetPersist(cycles)
+' cycles (field 'APERS')
+'   0000: Generate interrupt every ALS cycle
+'   0001: Generate interrupt anytime value goes outside threshold range/OOR
+'   0010: Generate interrupt when there have been 2 consecutive values OOR
+'   0011: 3
+'   0100: 5
+'   ..  : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+'   1111: 60
+  if cycles < 0 or cycles > 15
+    return
+  Command ( TSL_PERSIST)
+  WriteByte (cycles)
 
 PUB PID: PACKAGEID
 ' RO
@@ -218,14 +275,14 @@ PUB GetALS_Data
   ReadLong (@_als_data)
   return _als_data
 
-PUB ReadByte(register)
+PUB ReadByte(ptr_byte)
 
   i2c.start
   _ackbit := i2c.write (TSL2591_SLAVE|R)
-  i2c.pread (register, 1, TRUE)
+  i2c.pread (ptr_byte, 1, TRUE)
   i2c.stop
 
-PUB ReadWord(register) | raw_data
+PUB ReadWord(ptr_word) | raw_data
 
   i2c.start
   _ackbit := i2c.write (TSL2591_SLAVE|R)
@@ -234,18 +291,18 @@ PUB ReadWord(register) | raw_data
 '  ser.NewLine
 '  ser.Hex (raw_data, 4)
 '  ser.NewLine
-  word[register] := raw_data.word[0]
+  word[ptr_word] := raw_data.word[0]
 '  byte[register][0] := raw_data.byte[1]
 '  byte[register][1] := raw_data.byte[0]
 
-PUB ReadLong(register) | raw_data
+PUB ReadLong(ptr_long) | raw_data
 
   i2c.start
   _ackbit := i2c.write (TSL2591_SLAVE|R)
   i2c.pread (@raw_data, 4, TRUE)
   i2c.stop
 
-  long[register] := raw_data
+  long[ptr_long] := raw_data
 '  byte[register][0] := raw_data.byte[3]
 '  byte[register][1] := raw_data.byte[2]
 '  byte[register][2] := raw_data.byte[1]
