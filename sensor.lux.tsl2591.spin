@@ -37,7 +37,7 @@ CON
 'Select type of transaction to follow in subsequent data transfers
   TSL_CMD_TRANSACTION_NORMAL  = %01 << 5
   TSL_CMD_TRANSACTION_SPECIAL = %11 << 5
-  
+'Special function field - use if TSL_CMD_TRANSACTION_SPECIAL bits above are set
   TSL_CMD_ADDR_SF_FORCEINT    = %00100
   TSL_CMD_ADDR_SF_CLEARALSINT = %00110
   TSL_CMD_ADDR_SF_CLEARALS_NOPERSIST_INT  = %00111
@@ -84,6 +84,32 @@ PUB Command(register) | cmd_packet
 'Trans 6..5 01 nml, 11 spec_func
   cmd_packet.byte[0] := TSL2591_SLAVE|W
   cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_NORMAL) | register
+
+  i2c.start
+  i2c.pwrite (@cmd_packet, 2)
+  i2c.stop
+
+PUB SpecialFunc(func) | cmd_packet
+
+  case func
+    TSL_CMD_ADDR_SF_FORCEINT:
+      cmd_packet.byte[0] := TSL2591_SLAVE|W
+      cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_SPECIAL) | TSL_CMD_ADDR_SF_FORCEINT
+
+    TSL_CMD_ADDR_SF_CLEARALSINT:
+      cmd_packet.byte[0] := TSL2591_SLAVE|W
+      cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_SPECIAL) | TSL_CMD_ADDR_SF_CLEARALSINT
+
+    TSL_CMD_ADDR_SF_CLEARALS_NOPERSIST_INT:
+      cmd_packet.byte[0] := TSL2591_SLAVE|W
+      cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_SPECIAL) | TSL_CMD_ADDR_SF_CLEARALS_NOPERSIST_INT
+
+    TSL_CMD_ADDR_SF_CLEAR_NOPERSIST_INT:
+      cmd_packet.byte[0] := TSL2591_SLAVE|W
+      cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_SPECIAL) | TSL_CMD_ADDR_SF_CLEAR_NOPERSIST_INT
+
+    OTHER:
+      return
 
   i2c.start
   i2c.pwrite (@cmd_packet, 2)
