@@ -12,6 +12,8 @@ CON
   _clkmode = cfg#_clkmode
   _xinfreq = cfg#_xinfreq
 
+  I2C_HZ    = 100_000
+
 OBJ
 
   cfg   : "core.con.client.parraldev"
@@ -22,11 +24,60 @@ OBJ
 
 VAR
 
+  long _lux_cog
+  long _als_data
 
 PUB Main
 
-  ser.Start (115_200)
+  Setup
+  repeat
+    _als_data := lux.GetALS_Data
+    ser.Str (string("Full luminance data: "))
+    ser.Hex (_als_data, 8)
+    ser.NewLine
+
+    ser.Str (string("IR luminance data: "))
+    ser.Hex (lux.GetIR, 4)
+    ser.NewLine
+
+    ser.Str (string("Visible luminance data: "))
+    ser.Hex (lux.GetVisible, 4)
+    ser.NewLine
   
+    ser.NewLine
+    time.MSleep (500)
+
+PUB Setup | lux_found
+
+  ser.Start (115_200)
+  ser.Clear
+  ser.Str (string("Started TSL2591 demo", ser#NL))
+
+  _lux_cog := lux.Start (cfg#SCL, cfg#SDA, I2C_HZ)-1
+  ser.Str (string("Started tsl2591 object", ser#NL))
+
+  lux_found := lux.Find_TSL
+
+  if lux_found
+    ser.Str (string("TSL2591 found!", ser#NL))
+  else
+    ser.Str (string("TSL2591 not found - halting!", ser#NL))
+    lux.Stop
+    ser.Stop
+    repeat
+
+  lux.Enable (0, 0, 0, 1, 1)
+
+  waitkey
+
+  ser.Str (string("STATUS Register: $"))
+  ser.Hex (lux.Status, 4)
+  ser.NewLine
+
+PUB waitkey
+
+  ser.Str (string("Press any key", ser#NL))
+  ser.CharIn
 
 DAT
 {

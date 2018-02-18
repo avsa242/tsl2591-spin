@@ -9,7 +9,7 @@
 
 CON
 
-  TSL2591_SLAVE = $52
+  TSL2591_SLAVE = $29 << 1
   W             = %0
   R             = %1
   
@@ -35,8 +35,8 @@ CON
 'Select Command Register
   TSL_CMD       = %1000_0000
 'Select type of transaction to follow in subsequent data transfers
-  TSL_CMD_TRANSACTION_NORMAL  = %01
-  TSL_CMD_TRANSACTION_SPECIAL = %11
+  TSL_CMD_TRANSACTION_NORMAL  = %01 << 5
+  TSL_CMD_TRANSACTION_SPECIAL = %11 << 5
   
   TSL_CMD_ADDR_SF_FORCEINT    = %00100
   TSL_CMD_ADDR_SF_CLEARALSINT = %00110
@@ -45,25 +45,51 @@ CON
 
 VAR
 
+  byte  _ackbit
+  long  _nak
+  long  _monitor_stack[100]
+  long  _als_data
 
 OBJ
 
-  i2c : "jm_i2c_fast"
+  i2c   : "jm_i2c_fast"
 
-PUB null
-''This is not a top-level object
+PUB Null
+' This is not a top-level object
 
 PUB Start(I2C_SCL, I2C_SDA, I2C_HZ): okay
 
-  I2C_HZ := I2C_HZ <# 400_000                   'Clamp I2C clock to TSL2591 maximum spec
   okay := i2c.setupx (I2C_SCL, I2C_SDA, I2C_HZ)
-  ifnot okay
-    return
 
-PUB Command(transaction, addr_sf) | i, j
+PUB Stop
+
+  i2c.terminate
+
+PUB Find_TSL | check, device_id', package_id
+
+  i2c.start
+  check := i2c.write(TSL2591_SLAVE)
+  i2c.stop
+
+'  package_id := PID
+  device_id := ID
+
+
+  if (check == i2c#ACK) AND (device_id == $50)
+    return TRUE
+  else
+    return FALSE
+
+PUB Command(register) | cmd_packet
 'Trans 6..5 01 nml, 11 spec_func
+  cmd_packet.byte[0] := TSL2591_SLAVE|W
+  cmd_packet.byte[1] := (TSL_CMD | TSL_CMD_TRANSACTION_NORMAL) | register
 
-PUB Enable(NPIEN, SAI, AIEN, AEN, PON)
+  i2c.start
+  i2c.pwrite (@cmd_packet, 2)
+  i2c.stop
+
+PUB Enable(NPIEN, SAI, AIEN, AEN, PON) | ena_byte
 ' NPIEN 7
 ' SAI 6
 ' RES 5 (0)
@@ -71,19 +97,33 @@ PUB Enable(NPIEN, SAI, AIEN, AEN, PON)
 ' RES 3..2 (0)
 ' AEN 1
 ' PON 0
+  ena_byte := ((NPIEN & 1) << 7) | ((SAI & 1) << 6) | ((AIEN & 1) << 4) | ((AEN & 1) << 1) | (PON & 1)
+  Command (TSL_ENABLE)
+  WriteByte (ena_byte)
 
-PUB Control(SRESET, AGAIN, ATIME)
+PUB Control(SRESET, AGAIN, ATIME) | ctrl_byte
 ' SRESET 7
 ' RES 6 (0)
 ' AGAIN 5..4
 ' RES 3 (0)
 ' ATIME 2..0
+  ctrl_byte := ((SRESET & 1) << 7) | ((AGAIN & 3) << 4) | (ATIME & 5)
+  Command ( TSL_CONFIG)
+  WriteByte (ctrl_byte)
 
-PUB ALS_IntThresh(ALS_LOW, ALS_HIGH, NPALS_LOW, NPALS_HIGH)
+PUB SetALS_IntThresh(AILTL, AILTH, AIHTL, AIHTH) | als_long
 ' ALS: AILTL..AILTH low thresh, AIHTL..AIHTH high thresh
-' NPALS: No-persist ALS
+  als_long := (AILTL << 24) | (AILTH << 16) | (AIHTL << 8) | AIHTH
+  Command (TSL_AILTL)
+  WriteLong (als_long)
 
-PUB Persist(APERS)
+PUB SetNPALS_IntThresh(NPAILTL, NPAILTH, NPAIHTL, NPAIHTH) | npals_long
+' NPALS: No-persist ALS
+  npals_long := (NPAILTL << 24) | (NPAILTH << 16) | (NPAIHTL << 8) | NPAIHTH
+  Command ( TSL_NPAILTL)
+  WriteLong (npals_long)
+
+PUB GetPersist(APERS)
 ' RES 7..4 (0)
 ' APERS 3..0:
 '   0000: Every ALS cycle gen int
@@ -93,16 +133,35 @@ PUB Persist(APERS)
 '   0100: 5
 '   ..  : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 '   1111: 60
+  Command ( TSL_PERSIST)
+  ReadByte (@APERS) 'No bounds checking/clamping to lower 4 bits...should there be?
+
+PUB SetPersist(APERS)
+' RES 7..4 (0)
+' APERS 3..0:
+'   0000: Every ALS cycle gen int
+'   0001: Any val outside thresh
+'   0010: 2 consecutive values OOR
+'   0011: 3
+'   0100: 5
+'   ..  : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+'   1111: 60
+  Command ( TSL_PERSIST)
+  WriteByte ((||APERS) <# $0F)  'Take absolute value and clamp to 15/$0F
 
 PUB PID: PACKAGEID
 ' RO
 ' RES 7..6
 ' PID 5..4
 ' RES 3..0
+  Command (TSL_PID)
+  ReadByte (@PACKAGEID)
 
 PUB ID: DEVICEID
 ' RO
 ' ID 7..0
+  Command (TSL_ID)
+  ReadByte (@DEVICEID)
 
 PUB Status: DEVSTATUS
 ' RO
@@ -111,16 +170,75 @@ PUB Status: DEVSTATUS
 ' AINT 4
 ' RES 3..1
 ' AVALID 0
+  Command (TSL_STATUS)
+  ReadByte (@DEVSTATUS)
 
-PUB ALS_Data
+PUB GetVisible | vis_word
+
+  vis_word := (_als_data & $FFFF) - (_als_data.word[1])'_als_data >> 16)
+  return _als_data.word[0]
+
+PUB GetIR | als_long
+
+  return _als_data.word[1] & $FFFF
+
+PUB GetALS_Data
 ' C0DATAL
 ' C0DATAH
 ' C1DATAL
 ' C1DATAH
 ' Read 4 bytes
+  Command (TSL_C0DATAL)
+  ReadLong (@_als_data)
+  return _als_data
 
-PRI
+PUB ReadByte(register)
 
+  i2c.start
+  _ackbit := i2c.write (TSL2591_SLAVE|R)
+  i2c.pread (register, 1, TRUE)
+  i2c.stop
+
+PUB ReadWord(register) | raw_data
+
+  i2c.start
+  _ackbit := i2c.write (TSL2591_SLAVE|R)
+  i2c.pread (@raw_data, 2, TRUE)
+  i2c.stop
+'  ser.NewLine
+'  ser.Hex (raw_data, 4)
+'  ser.NewLine
+  word[register] := raw_data.word[0]
+'  byte[register][0] := raw_data.byte[1]
+'  byte[register][1] := raw_data.byte[0]
+
+PUB ReadLong(register) | raw_data
+
+  i2c.start
+  _ackbit := i2c.write (TSL2591_SLAVE|R)
+  i2c.pread (@raw_data, 4, TRUE)
+  i2c.stop
+
+  long[register] := raw_data
+'  byte[register][0] := raw_data.byte[3]
+'  byte[register][1] := raw_data.byte[2]
+'  byte[register][2] := raw_data.byte[1]
+'  byte[register][3] := raw_data.byte[0]
+
+PUB WriteByte(data_byte)
+
+  i2c.start
+  i2c.write (TSL2591_SLAVE|W)
+  _ackbit := i2c.write (data_byte)
+  i2c.stop
+
+PUB WriteLong(data_long) | byte_part
+
+  i2c.start
+  i2c.write (TSL2591_SLAVE|W)
+'  _ackbit := i2c.write (data_byte)
+  _ackbit := i2c.pwrite (data_long, 4)
+  i2c.stop
 
 DAT
 {
