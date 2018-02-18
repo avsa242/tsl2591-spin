@@ -30,6 +30,41 @@ VAR
 PUB Main
 
   Setup
+  ser.Str (string("Before:", ser#NL))
+  ser.Hex (lux.GetState, 8)
+  ser.NewLine
+  ser.Hex (lux.GetNPIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetSAI, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetPON, 8)
+  ser.NewLine
+
+  lux.Enable (1, 1, 1, 1, 1)'NPIEN, SAI, AIEN, AEN, PON)
+
+  ser.Str (string("After:", ser#NL))
+  ser.Hex (lux.GetState, 8)
+  ser.NewLine
+  ser.Hex (lux.GetNPIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetSAI, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetPON, 8)
+  ser.NewLine
+
+
+
+  debug.here (16)
+
+PUB Luminance_Loop
   repeat
     _als_data := lux.GetALS_Data
     ser.Str (string("Full luminance data: "))
@@ -69,11 +104,11 @@ PUB Setup | lux_found
   lux.Enable (0, 0, 0, 1, 1)
 
   waitkey
-
+{
   ser.Str (string("STATUS Register: $"))
   ser.Hex (lux.Status, 4)
   ser.NewLine
-
+}
 PUB waitkey
 
   ser.Str (string("Press any key", ser#NL))
