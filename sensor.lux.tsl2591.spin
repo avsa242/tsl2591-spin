@@ -100,6 +100,17 @@ PUB Command(register) | cmd_packet
   i2c.pwrite (@cmd_packet, 2)
   i2c.stop
 
+PUB CommandWords(register, high_word, low_word) | cmd_packet[2]
+
+  cmd_packet.byte[0] := TSL2591_SLAVE|W
+  cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_NORMAL) | (register & %11111)
+  cmd_packet.word[1] := low_word
+  cmd_packet.word[2] := high_word
+
+  i2c.start
+  _ackbit := i2c.pwrite (@cmd_packet, 6)
+  i2c.stop
+
 PUB SpecialFunc(func) | cmd_packet
 'Set/clear interrupts
 ' %00100: Force Interrupt
@@ -150,7 +161,7 @@ PUB GetState: state
   Command (TSL2591_ENABLE)
   ReadByte (@state)
 
-PUB GetNPIEN: npien
+PUB GetNPIEN: npien 'XXX NOT SURE
 'Gets No-Persist Interrupt ENable field
 'Queries Enable Register and returns No-Persist Interrupt ENable field bit
   long[npien] := (GetState >> 7) & 1
@@ -217,15 +228,13 @@ PUB GetATime: a_time
 ' %101  600ms     65535
   byte[a_time] := GetControlReg & %111
 
-PUB SetALS_IntThresh(low_threshold_word, high_threshold_word) | als_long
+PUB SetALS_IntThresh(low_threshold_word, high_threshold_word) | als_long 'XXX Change order of params to match return from GetALS?
 'Sets ALS threshold values/registers ($04..$07)
 ' low_threshold_word - Low threshold
 ' high_threshold_word - high threshold
   if low_threshold_word < 0 or low_threshold_word > 65535 or high_threshold_word < 0 or high_threshold_word > 65535
     return
-  als_long := (high_threshold_word << 16) | low_threshold_word
-  Command (TSL2591_AILTL)
-  WriteLong (als_long)
+  CommandWords (TSL2591_AILTL, high_threshold_word, low_threshold_word)
 
 PUB GetALS_IntThresh: threshold | als_long
 'Gets ALS threshold values currently set
@@ -240,9 +249,7 @@ PUB SetNPALS_IntThresh(nopersist_low_threshold_word, nopersist_high_threshold_wo
 ' nopersist_high_threshold_word - No-persist high threshold
   if nopersist_low_threshold_word < 0 or nopersist_low_threshold_word > 65535 or nopersist_high_threshold_word < 0 or nopersist_high_threshold_word > 65535
     return
-  npals_long := (nopersist_high_threshold_word << 16) | nopersist_low_threshold_word
-  Command (TSL2591_NPAILTL)
-  WriteLong (npals_long)
+  CommandWords (TSL2591_NPAILTL, nopersist_high_threshold_word, nopersist_low_threshold_word)
 
 PUB GetNPALS_IntThresh: threshold | npals_long
 'Gets no-persist ALS threshold values currently set
@@ -345,7 +352,6 @@ PUB ReadLong(ptr_long) | raw_data
   _ackbit := i2c.write (TSL2591_SLAVE|R)
   i2c.pread (@raw_data, 4, TRUE)
   i2c.stop
-
   long[ptr_long] := raw_data
 
 PUB WriteByte(data_byte)
@@ -359,7 +365,7 @@ PUB WriteLong(data_long) | byte_part
 'Writes four bytes (packed into one long) to the TSL2591
   i2c.start
   i2c.write (TSL2591_SLAVE|W)
-  _ackbit := i2c.pwrite (data_long, 4)
+  _ackbit := i2c.pwrite (@data_long, 4)
   i2c.stop
 
 DAT

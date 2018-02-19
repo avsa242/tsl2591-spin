@@ -30,41 +30,150 @@ VAR
 PUB Main
 
   Setup
-  ser.Str (string("Before:", ser#NL))
-  ser.Hex (lux.GetState, 8)
+  time.Sleep (1)
   ser.NewLine
-  ser.Hex (lux.GetNPIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetSAI, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetPON, 8)
-  ser.NewLine
-
-  lux.Enable (1, 1, 1, 1, 1)'NPIEN, SAI, AIEN, AEN, PON)
-
-  ser.Str (string("After:", ser#NL))
-  ser.Hex (lux.GetState, 8)
-  ser.NewLine
-  ser.Hex (lux.GetNPIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetSAI, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetPON, 8)
-  ser.NewLine
-
-
-
+  TestENABLE_reg
+  TestCONTROL_reg
+  TestALSIntThresh_reg
+  TestNPALSIntThresh_reg
+  TestPERSIST_reg
+  TestRO_regs
   debug.here (16)
 
-PUB Luminance_Loop
+PUB TestRO_regs | package_id, device_id, status_reg, als_data
+
+  ser.Str (string("Package ($11) ID: "))
+  ser.Hex (lux.GetPackageID, 8)
+  ser.NewLine
+
+  ser.Str (string("Device ($12) ID: "))
+  ser.Hex (lux.GetDeviceID, 8)
+  ser.NewLine
+
+  ser.Str (string("Status ($13) reg: "))
+  ser.Hex (lux.Status, 8)
+  ser.NewLine
+
+  ser.Str (string("ALS Data ($14..$17): "))
+  ser.Hex (lux.GetALS_Data, 8)
+  ser.NewLine
+
+PUB TestPERSIST_reg | testval, readback
+
+  testval := 3
+
+  ser.Str (string("PERSIST ($0C) register readback test", ser#NL))
+  ser.Str (string("Current settings:", ser#NL))
+  ser.Hex (lux.GetPersist, 8)
+  ser.NewLine
+
+  ser.Str (string("About to set:", ser#NL))
+  ser.Hex (testval, 8)
+  ser.NewLine
+  lux.SetPersist (testval)
+  readback := lux.GetPersist
+
+  ser.Str (string("Readback:", ser#NL))
+  ser.Hex (readback, 8)
+  ser.NewLine
+
+  if readback == testval
+    ser.Str (string("*** PASSED ***", ser#NL))
+  else
+    ser.Str (STRING("*** FAILED ***", ser#NL))
+
+PUB TestNPALSIntThresh_reg | testval, readback
+
+  testval := $DEAD_FACE
+  ser.Str (string("No-persist ALS Interrupt Threshold ($08..$0B) register readback test", ser#NL))
+  ser.Str (string("Current settings: "))
+  ser.Hex (lux.GetNPALS_IntThresh, 8)
+  ser.NewLine
+
+  ser.Str (string("About to set: "))
+  ser.Hex (testval, 8)
+  ser.NewLine
+  lux.SetNPALS_IntThresh (testval.word[0], testval.word[1])
+  readback := lux.GetNPALS_IntThresh
+
+  ser.Str (string("Readback: "))
+  ser.Hex (readback, 8)
+  ser.NewLine
+
+  if readback == testval
+    ser.Str (string("*** PASSED ***", ser#NL))
+  else
+    ser.Str (STRING("*** FAILED ***", ser#NL))
+
+PUB TestALSIntThresh_reg | testval, readback
+
+  testval := $DEAD_BEEF
+  ser.Str (string("ALS Interrupt Threshold ($04..$07) register readback test", ser#NL))
+  ser.Str (string("Current settings: "))
+  ser.Hex (lux.GetALS_IntThresh, 8)
+  ser.NewLine
+
+  ser.Str (string("About to set: "))
+  ser.Hex (testval, 8)
+  ser.NewLine
+  lux.SetALS_IntThresh (testval.word[0], testval.word[1])
+  readback := lux.GetALS_IntThresh
+
+  ser.Str (string("Readback: "))
+  ser.Hex (readback, 8)
+  ser.NewLine
+
+  if readback == testval
+    ser.Str (string("*** PASSED ***", ser#NL))
+  else
+    ser.Str (STRING("*** FAILED ***", ser#NL))
+
+PUB TestCONTROL_reg
+
+  ser.Str (string("CONTROL ($01) register readback test", ser#NL))
+  ser.Str (string("Current settings:", ser#NL))
+  ser.Hex (lux.GetControlReg, 8)
+  ser.NewLine
+  lux.Control (0, %00, %101)
+  ser.Str (string("Readback:", ser#NL))
+  ser.Hex (lux.GetControlReg, 8)
+  ser.NewLine
+
+PUB TestENABLE_reg
+
+  ser.Str (string("ENABLE ($00) register readback test", ser#NL))
+  ser.Str (string("Current settings:", ser#NL))
+  ser.Hex (lux.GetState, 8)
+  ser.NewLine
+  ser.Hex (lux.GetNPIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetSAI, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetPON, 8)
+  ser.NewLine
+
+  lux.Enable (0, 0, 0, 1, 1)
+
+  ser.Str (string("Readback:", ser#NL))
+  ser.Hex (lux.GetState, 8)
+  ser.NewLine
+  ser.Hex (lux.GetNPIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetSAI, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAIEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetAEN, 8)
+  ser.NewLine
+  ser.Hex (lux.GetPON, 8)
+  ser.NewLine
+
+PUB Test_Luminance
+
   repeat
     _als_data := lux.GetALS_Data
     ser.Str (string("Full luminance data: "))
@@ -103,16 +212,10 @@ PUB Setup | lux_found
 
   lux.Enable (0, 0, 0, 1, 1)
 
-  waitkey
-{
-  ser.Str (string("STATUS Register: $"))
-  ser.Hex (lux.Status, 4)
-  ser.NewLine
-}
 PUB waitkey
 
-  ser.Str (string("Press any key", ser#NL))
-  ser.CharIn
+ser.Str (string("Press any key", ser#NL))
+ser.CharIn
 
 DAT
 {
