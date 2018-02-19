@@ -164,27 +164,27 @@ PUB GetState: state
 PUB GetNPIEN: npien 'XXX NOT SURE
 'Gets No-Persist Interrupt ENable field
 'Queries Enable Register and returns No-Persist Interrupt ENable field bit
-  long[npien] := (GetState >> 7) & 1
+  npien := (GetState >> 7) & 1
 
 PUB GetSAI: sai
 'Gets Sleep After Interrupt field
 'Queries Enable Register and returns Sleep After Interrupt field bit
-  long[sai] := (GetState >> 6) & 1
+  sai := (GetState >> 6) & 1
 
 PUB GetAIEN: aien
 'Gets ALS Interrupt ENable field
 'Queries Enable Register and returns ALS Interrupt ENable field bits
-  long[aien] := (GetState >> 4) & 1
+  aien := (GetState >> 4) & 1
 
 PUB GetAEN: aen
 'Gets ALS ENable field
 'Queries Enable Register and returns ALS ENable field bit
-  long[aen] := (GetState >> 1) & 1
+  aen := (GetState >> 1) & 1
 
 PUB GetPON: pon
 'Gets Power ON field
 'Queries Enable Register and returns Power ON field bit
-  long[pon] := GetState & 1
+  pon := GetState & 1
 
 PUB Control(SRESET, AGAIN, ATIME) | ctrl_byte
 'Set ALS Gain and ADC integration Time, and also provide System Reset

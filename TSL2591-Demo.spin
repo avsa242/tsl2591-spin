@@ -38,7 +38,20 @@ PUB Main
   TestNPALSIntThresh_reg
   TestPERSIST_reg
   TestRO_regs
-  debug.here (16)
+
+  waitmsg (string("Press any key to begin continuous read of sensor...", ser#NL))
+  ser.Clear
+
+  repeat
+    _als_data := lux.GetALS_Data
+    ser.Str (string("IR light data: "))
+    ser.hex (lux.GetIR, 4)
+    ser.NewLine
+    ser.Str (string("Visible light data: "))
+    ser.hex (lux.GetVisible, 4)
+    ser.NewLine
+    time.MSleep (250)
+    ser.NewLine
 
 PUB TestRO_regs | package_id, device_id, status_reg, als_data
 
@@ -143,33 +156,31 @@ PUB TestENABLE_reg
 
   ser.Str (string("ENABLE ($00) register readback test", ser#NL))
   ser.Str (string("Current settings:", ser#NL))
-  ser.Hex (lux.GetState, 8)
-  ser.NewLine
-  ser.Hex (lux.GetNPIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetSAI, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetPON, 8)
+  ser.Str (string("NPIEN: "))
+  ser.Hex (lux.GetNPIEN, 2)'XXX
+  ser.Str (string(" SAI: "))
+  ser.Hex (lux.GetSAI, 2)'XXX
+  ser.Str (string(" AIEN: "))
+  ser.Hex (lux.GetAIEN, 2)'XXX
+  ser.Str (string(" AEN: "))
+  ser.Hex (lux.GetAEN, 2)'XXX
+  ser.Str (string(" PON: "))
+  ser.Hex (lux.GetPON, 2)'XXX
   ser.NewLine
 
   lux.Enable (0, 0, 0, 1, 1)
 
   ser.Str (string("Readback:", ser#NL))
-  ser.Hex (lux.GetState, 8)
-  ser.NewLine
-  ser.Hex (lux.GetNPIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetSAI, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAIEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetAEN, 8)
-  ser.NewLine
-  ser.Hex (lux.GetPON, 8)
+  ser.Str (string("NPIEN: "))
+  ser.Hex (lux.GetNPIEN, 2)'XXX
+  ser.Str (string(" SAI: "))
+  ser.Hex (lux.GetSAI, 2)'XXX
+  ser.Str (string(" AIEN: "))
+  ser.Hex (lux.GetAIEN, 2)'XXX
+  ser.Str (string(" AEN: "))
+  ser.Hex (lux.GetAEN, 2)'XXX
+  ser.Str (string(" PON: "))
+  ser.Hex (lux.GetPON, 2)'XXX
   ser.NewLine
 
 PUB Test_Luminance
@@ -214,8 +225,13 @@ PUB Setup | lux_found
 
 PUB waitkey
 
-ser.Str (string("Press any key", ser#NL))
-ser.CharIn
+  ser.Str (string("Press any key", ser#NL))
+  ser.CharIn
+
+PUB waitmsg(msg_string)
+
+  ser.Str (msg_string)
+  ser.CharIn
 
 DAT
 {
