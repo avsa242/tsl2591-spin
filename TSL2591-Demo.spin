@@ -13,6 +13,7 @@ CON
   _xinfreq = cfg#_xinfreq
 
   I2C_HZ    = 100_000
+  TSL2591_LUX_DF  = 408
 
 OBJ
 
@@ -21,54 +22,50 @@ OBJ
   time  : "time"
   lux   : "sensor.lux.tsl2591"
   debug : "debug"
+  math  : "math.float"
+  fs    : "string.float"
 
 VAR
 
   long _lux_cog
   long _als_data
+  long ch0, ch1
+  long scale
 
 PUB Main
 
   Setup
   time.Sleep (1)
   ser.NewLine
-  TestENABLE_reg
+{  TestENABLE_reg
   TestCONTROL_reg
   TestALSIntThresh_reg
   TestNPALSIntThresh_reg
   TestPERSIST_reg
   TestRO_regs
-
+}
   waitmsg (string("Press any key to begin continuous read of sensor...", ser#NL))
   ser.Clear
 
   repeat
-    _als_data := lux.GetALS_Data
-    ser.Str (string("IR light data: "))
-    ser.hex (lux.GetIR, 4)
-    ser.NewLine
-    ser.Str (string("Visible light data: "))
-    ser.hex (lux.GetVisible, 4)
-    ser.NewLine
-    time.MSleep (250)
-    ser.NewLine
+    Test_Luminance
 
 PUB TestRO_regs | package_id, device_id, status_reg, als_data
 
   ser.Str (string("Package ($11) ID: "))
-  ser.Hex (lux.GetPackageID, 8)
+  ser.Hex (lux.GetPackageIDReg, 8)
   ser.NewLine
 
   ser.Str (string("Device ($12) ID: "))
-  ser.Hex (lux.GetDeviceID, 8)
+  ser.Hex (lux.GetDeviceIDReg, 8)
   ser.NewLine
 
   ser.Str (string("Status ($13) reg: "))
-  ser.Hex (lux.Status, 8)
+  ser.Hex (lux.GetStatusReg, 8)
   ser.NewLine
 
   ser.Str (string("ALS Data ($14..$17): "))
-  ser.Hex (lux.GetALS_Data, 8)
+  ser.Hex (lux.GetALSDataReg, 8)
   ser.NewLine
 
 PUB TestPERSIST_reg | testval, readback
@@ -77,14 +74,14 @@ PUB TestPERSIST_reg | testval, readback
 
   ser.Str (string("PERSIST ($0C) register readback test", ser#NL))
   ser.Str (string("Current settings:", ser#NL))
-  ser.Hex (lux.GetPersist, 8)
+  ser.Hex (lux.GetPersistReg, 8)
   ser.NewLine
 
   ser.Str (string("About to set:", ser#NL))
   ser.Hex (testval, 8)
   ser.NewLine
-  lux.SetPersist (testval)
-  readback := lux.GetPersist
+  lux.SetPersistReg (testval)
+  readback := lux.GetPersistReg
 
   ser.Str (string("Readback:", ser#NL))
   ser.Hex (readback, 8)
@@ -100,14 +97,14 @@ PUB TestNPALSIntThresh_reg | testval, readback
   testval := $DEAD_FACE
   ser.Str (string("No-persist ALS Interrupt Threshold ($08..$0B) register readback test", ser#NL))
   ser.Str (string("Current settings: "))
-  ser.Hex (lux.GetNPALS_IntThresh, 8)
+  ser.Hex (lux.GetNPALS_IntThreshReg, 8)
   ser.NewLine
 
   ser.Str (string("About to set: "))
   ser.Hex (testval, 8)
   ser.NewLine
-  lux.SetNPALS_IntThresh (testval.word[0], testval.word[1])
-  readback := lux.GetNPALS_IntThresh
+  lux.SetNPALS_IntThreshReg (testval.word[0], testval.word[1])
+  readback := lux.GetNPALS_IntThreshReg
 
   ser.Str (string("Readback: "))
   ser.Hex (readback, 8)
@@ -123,14 +120,14 @@ PUB TestALSIntThresh_reg | testval, readback
   testval := $DEAD_BEEF
   ser.Str (string("ALS Interrupt Threshold ($04..$07) register readback test", ser#NL))
   ser.Str (string("Current settings: "))
-  ser.Hex (lux.GetALS_IntThresh, 8)
+  ser.Hex (lux.GetALS_IntThreshReg, 8)
   ser.NewLine
 
   ser.Str (string("About to set: "))
   ser.Hex (testval, 8)
   ser.NewLine
-  lux.SetALS_IntThresh (testval.word[0], testval.word[1])
-  readback := lux.GetALS_IntThresh
+  lux.SetALS_IntThreshReg (testval.word[0], testval.word[1])
+  readback := lux.GetALS_IntThreshReg
 
   ser.Str (string("Readback: "))
   ser.Hex (readback, 8)
@@ -147,7 +144,7 @@ PUB TestCONTROL_reg
   ser.Str (string("Current settings:", ser#NL))
   ser.Hex (lux.GetControlReg, 8)
   ser.NewLine
-  lux.Control (0, %00, %101)
+  lux.SetControlReg (0, %00, %000)
   ser.Str (string("Readback:", ser#NL))
   ser.Hex (lux.GetControlReg, 8)
   ser.NewLine
@@ -168,7 +165,7 @@ PUB TestENABLE_reg
   ser.Hex (lux.GetPON, 2)'XXX
   ser.NewLine
 
-  lux.Enable (0, 0, 0, 1, 1)
+  lux.SetEnableReg (0, 0, 0, 1, 1)
 
   ser.Str (string("Readback:", ser#NL))
   ser.Str (string("NPIEN: "))
@@ -183,24 +180,56 @@ PUB TestENABLE_reg
   ser.Hex (lux.GetPON, 2)'XXX
   ser.NewLine
 
+PUB calc_f_Lux: f_lux | f_atime, f_again, f_df, f_ga, f_dgf, f_dim_incan, f_cpl, f_lux1, f_lux2, lux_tmp
+{
+From AMS DN28:
+Data Sheet Lux Equation:
+
+CPL = (ATIME_ms * AGAINx) / (GA * 53)
+Lux1 = (C0DATA – 2 * C1DATA) / CPL
+Lux2 = (0.6 * C0DATA − C1DATA) / CPL
+Lux = MAX(Lux1, Lux2, 0)
+
+Terms:
+CPL = Counts Per Lux
+GA = Glass Attenuation (Open Air = 1.0)
+DF = Device Factor
+DGF = GA * DF
+
+}
+
+  f_atime := 100.0
+  f_again := 1.0
+  f_df := 53.0
+  f_ga := 1.0
+  f_dgf := math.MulF (f_df, f_ga)
+  f_dim_incan := 0.6
+
+  f_cpl := math.DivF (math.MulF (f_atime, f_again), f_df)
+  f_lux1 := math.DivF (math.SubF (ch0, math.MulF (2.0, ch1)), f_cpl)
+  f_lux2 := math.DivF (math.SubF (math.MulF (f_dim_incan, ch0), ch1), f_cpl)
+  lux_tmp := math.CmpF (f_lux1, f_lux2)
+  case lux_tmp
+    -1:
+      return fs.FloatToString (f_lux2)
+    0:
+      return fs.FloatToString (f_lux1)
+    1:
+      return fs.FloatToString (f_lux1)
+    OTHER:
+      return 0
+
 PUB Test_Luminance
-
-  repeat
-    _als_data := lux.GetALS_Data
-    ser.Str (string("Full luminance data: "))
-    ser.Hex (_als_data, 8)
-    ser.NewLine
-
-    ser.Str (string("IR luminance data: "))
-    ser.Hex (lux.GetIR, 4)
-    ser.NewLine
-
-    ser.Str (string("Visible luminance data: "))
-    ser.Hex (lux.GetVisible, 4)
-    ser.NewLine
   
-    ser.NewLine
-    time.MSleep (500)
+  ser.Clear
+  _als_data := lux.GetALSDataReg
+  ch0 := math.FloatF (lux.GetALSData_Full)
+  ch1 := math.FloatF (lux.GetALSData_IR)
+  ser.Str (string("f_Lux: "))
+  ser.Str (calc_f_Lux)
+  ser.NewLine
+  time.MSleep (120)
+
 
 PUB Setup | lux_found
 
@@ -208,10 +237,12 @@ PUB Setup | lux_found
   ser.Clear
   ser.Str (string("Started TSL2591 demo", ser#NL))
 
+  math.Start
+  fs.SetPrecision (6)
   _lux_cog := lux.Start (cfg#SCL, cfg#SDA, I2C_HZ)-1
   ser.Str (string("Started tsl2591 object", ser#NL))
 
-  lux_found := lux.Find_TSL
+  lux_found := lux.Probe_TSL2591
 
   if lux_found
     ser.Str (string("TSL2591 found!", ser#NL))
@@ -221,7 +252,7 @@ PUB Setup | lux_found
     ser.Stop
     repeat
 
-  lux.Enable (0, 0, 0, 1, 1)
+  lux.SetEnableReg (0, 0, 0, 1, 1)
 
 PUB waitkey
 
