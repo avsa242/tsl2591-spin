@@ -200,7 +200,7 @@ DGF = GA * DF
 
   f_atime := 100.0
   f_again := 1.0
-  f_df := 53.0
+  f_df := 687.0' 355works for phone under bin..not under shop light (FL)... FL=687
   f_ga := 1.0
   f_dgf := math.MulF (f_df, f_ga)
   f_dim_incan := 0.6
@@ -211,31 +211,42 @@ DGF = GA * DF
   lux_tmp := math.CmpF (f_lux1, f_lux2)
   case lux_tmp
     -1:
-      return fs.FloatToString (f_lux2)
+'      return fs.FloatToString (f_lux2)
+      lux_tmp := f_lux2
     0:
-      return fs.FloatToString (f_lux1)
+'      return fs.FloatToString (0)
+      lux_tmp := f_lux1
     1:
-      return fs.FloatToString (f_lux1)
+'      return fs.FloatToString (f_lux1)
+      lux_tmp := f_lux1
     OTHER:
-      return 0
+'      return 0
+
+  case math.CmpF (lux_tmp, 0)
+    -1:
+      return fs.FloatToString (0.0)
+    0:
+      return fs.FloatToString (0.0)
+    1:
+      return fs.FloatToString (lux_tmp)
 
 PUB Test_Luminance
   
-  ser.Clear
   _als_data := lux.GetALSDataReg
   ch0 := math.FloatF (lux.GetALSData_Full)
   ch1 := math.FloatF (lux.GetALSData_IR)
+  ser.Position (0, 0)
   ser.Str (string("f_Lux: "))
   ser.Str (calc_f_Lux)
   ser.NewLine
-  time.MSleep (120)
+  time.MSleep (100)
 
 
 PUB Setup | lux_found
 
   ser.Start (115_200)
   ser.Clear
-  ser.Str (string("Started TSL2591 demo", ser#NL))
+  ser.Str (string("TSL2591 demo", ser#NL))
 
   math.Start
   fs.SetPrecision (6)

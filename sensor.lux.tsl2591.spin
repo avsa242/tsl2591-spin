@@ -402,7 +402,19 @@ PUB SetPersistReg(cycles)
     OTHER:
       return
 
-PUB SetSAI(bool__sleep_after_interrupt)
+PUB SetSAI(bool__sleep_after_interrupt) | npien, aien, aen, pon
+'Enable Sleep After Interrupt
+'Enable or Disable Sleeping after an Interrupt is asserted
+  case ||bool__sleep_after_interrupt
+    0..1: bool__sleep_after_interrupt &= 1
+    OTHER: bool__sleep_after_interrupt := 0
+
+  npien := GetNPIEN
+  aien := GetAIEN
+  aen := GetAEN
+  pon := GetPON
+
+  SetEnableReg (NPIEN, bool__sleep_after_interrupt, AIEN, AEN, PON)
 
 PUB SetSpecialFunc(func) | cmd_packet
 'Set/clear interrupts
