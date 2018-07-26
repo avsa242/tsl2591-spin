@@ -12,7 +12,6 @@ CON
   _clkmode = cfg#_clkmode
   _xinfreq = cfg#_xinfreq
 
-  I2C_HZ    = 100_000
   TSL2591_LUX_DF  = 408
 
 OBJ
@@ -250,7 +249,7 @@ PUB Setup | lux_found
 
   math.Start
   fs.SetPrecision (6)
-  _lux_cog := lux.Start (cfg#SCL, cfg#SDA, I2C_HZ)-1
+  _lux_cog := lux.Start-1
   ser.Str (string("Started tsl2591 object", ser#NL))
 
   lux_found := lux.Probe_TSL2591

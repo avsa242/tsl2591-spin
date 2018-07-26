@@ -23,8 +23,11 @@ CON
   TSL2591_SLAVE     = $29 << 1
   W                 = %0
   R                 = %1
-  TSL2591_MAX_RATE  = 400_000   'Max I2C Clock, per TSL2591 datasheet
-  
+
+  SCL               = 28
+  SDA               = 29
+  HZ                = tsl2591#I2C_MAX_RATE
+
   #0, GAIN_LOW, GAIN_MED, GAIN_HI, GAIN_MAX
 
 VAR
@@ -40,11 +43,25 @@ OBJ
 PUB Null
 ' This is not a top-level object
 
-PUB Start(i2c_scl, i2c_sda, i2c_Hz): okay
-'Start I2C object - limit bus speed to 400kHz maximum, specified by TLS2591 datasheet
-'Passes through return value of i2c object
-  i2c_Hz := (||i2c_Hz) <# tsl2591#I2C_MAX_RATE
-  okay := i2c.setupx (i2c_scl, i2c_sda, i2c_Hz)
+PUB Start: okay                                         'Default to "standard" Propeller I2C pins and 400kHz
+
+  okay := Startx (SCL, SDA, HZ)
+
+PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ)
+
+  if lookdown(SCL_PIN: 0..31)                           'Validate pins
+    if lookdown(SDA_PIN: 0..31)
+      if SCL_PIN <> SDA_PIN
+        if I2C_HZ =< HZ
+          return i2c.setupx (SCL_PIN, SDA_PIN, I2C_HZ)
+        else
+          return FALSE
+      else
+        return FALSE
+    else
+      return FALSE
+  else
+    return FALSE
 
 PUB Stop
 'Kills I2C cog
