@@ -25,36 +25,6 @@ CON
   R                 = %1
   TSL2591_MAX_RATE  = 400_000   'Max I2C Clock, per TSL2591 datasheet
   
-  TSL2591_ENABLE    = $00
-  TSL2591_CONFIG    = $01
-  TSL2591_AILTL     = $04
-  TSL2591_AILTH     = $05
-  TSL2591_AIHTL     = $06
-  TSL2591_AIHTH     = $07
-  TSL2591_NPAILTL   = $08
-  TSL2591_NPAILTH   = $09
-  TSL2591_NPAIHTL   = $0A
-  TSL2591_NPAIHTH   = $0B
-  TSL2591_PERSIST   = $0C
-  TSL2591_PID       = $11
-  TSL2591_ID        = $12
-  TSL2591_STATUS    = $13
-  TSL2591_C0DATAL   = $14
-  TSL2591_C0DATAH   = $15
-  TSL2591_C1DATAL   = $16
-  TSL2591_C1DATAH   = $17
-
-'Select Command Register
-  TSL2591_CMD                                 = %1000_0000
-'Select type of transaction to follow in subsequent data transfers
-  TSL2591_CMD_NORMAL                          =  %01      << 5
-  TSL2591_CMD_SPECIAL                         =  %11      << 5
-'Special function field - use if TSL2591_CMD_SPECIAL bits above are set
-  TSL2591_CMD_SPECIAL_FORCEINT                =     %00100
-  TSL2591_CMD_SPECIAL_CLEARALSINT             =     %00110
-  TSL2591_CMD_SPECIAL_CLEARALS_NOPERSIST_INT  =     %00111
-  TSL2591_CMD_SPECIAL_CLEAR_NOPERSIST_INT     =     %01010
-
   #0, GAIN_LOW, GAIN_MED, GAIN_HI, GAIN_MAX
 
 VAR
@@ -64,7 +34,8 @@ VAR
 
 OBJ
 
-  i2c   : "jm_i2c_fast"
+  i2c     : "jm_i2c_fast"
+  tsl2591 : "core.con.tsl2591"
 
 PUB Null
 ' This is not a top-level object
@@ -72,7 +43,7 @@ PUB Null
 PUB Start(i2c_scl, i2c_sda, i2c_Hz): okay
 'Start I2C object - limit bus speed to 400kHz maximum, specified by TLS2591 datasheet
 'Passes through return value of i2c object
-  i2c_Hz := (||i2c_Hz) <# TSL2591_MAX_RATE
+  i2c_Hz := (||i2c_Hz) <# tsl2591#I2C_MAX_RATE
   okay := i2c.setupx (i2c_scl, i2c_sda, i2c_Hz)
 
 PUB Stop
@@ -91,21 +62,21 @@ PUB CheckNPINT: bool__NPALS_interrupt
 
 PUB ClearALS_INT
 'Clears ALS Interrupt
-  SetSpecialFunc (TSL2591_CMD_SPECIAL_CLEARALSINT)
+  SetSpecialFunc (tsl2591#SPECFUNC_CLEARALSINT)
 
 PUB ClearALL_INTs
 'Clears both ALS and NPALS Interrupts
-  SetSpecialFunc (TSL2591_CMD_SPECIAL_CLEARALS_NOPERSIST_INT)
+  SetSpecialFunc (tsl2591#SPECFUNC_CLEARALS_NOPERSIST_INT)
 
 PUB ClearNPALS_INT
 'Clears NPALS Interrupt
-  SetSpecialFunc (TSL2591_CMD_SPECIAL_CLEAR_NOPERSIST_INT)
+  SetSpecialFunc (tsl2591#SPECFUNC_CLEAR_NOPERSIST_INT)
 
 PUB ForceINT
 'Force an ALS Interrupt
 'NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
 ' one of the interrupt enable bits in the ENABLE ($00) register must be set
-  SetSpecialFunc (TSL2591_CMD_SPECIAL_FORCEINT)
+  SetSpecialFunc (tsl2591#SPECFUNC_FORCEINT)
 
 PUB GetAEN: bool__ALS_Enabled
 'Gets ALS ENable field
@@ -129,7 +100,7 @@ PUB GetALS_IntThreshReg: long__threshold | als_long
 'Gets ALS threshold values currently set
 ' Bits 31..16: AIHTH_AIHTL - High threshold word
 '      15..0: AILTH_AILTL - Low threshold word
-  Command (TSL2591_AILTL)
+  Command (tsl2591#REG_AILTL)
   ReadLong (@long__threshold)
 
 PUB GetALSDataReg: long__ALS_data
@@ -137,7 +108,7 @@ PUB GetALSDataReg: long__ALS_data
 'Reads ALS data from both channels
 ' Bits 31..16/Most-significant word contain the IR data
 ' Bits  15..0/Least-significant word contain the Full light data
-  Command (TSL2591_C0DATAL)
+  Command (tsl2591#REG_C0DATAL)
   ReadLong (@_als_data)
   long__ALS_data := _als_data
 
@@ -185,19 +156,19 @@ PUB GetControlReg: ctrl_reg
 '      5..4: AGAIN - ALS Gain
 '         3: Reserved (should read 0)
 '      2..0: ATIME - ADC integration Time
-  Command (TSL2591_CONFIG)
+  Command (tsl2591#REG_CONFIG)
   ReadByte (@ctrl_reg)
 
 PUB GetDeviceIDReg: device_id
 'Returns Device ID register ($12)
 'Should return $50
 ' Bits 7..0: ID
-  Command (TSL2591_ID)
+  Command (tsl2591#REG_ID)
   ReadByte (@device_id)
 
 PUB GetEnableReg: state
 'Returns Enable Register ($00) contents
-  Command (TSL2591_ENABLE)
+  Command (tsl2591#REG_ENABLE)
   ReadByte (@state)
 
 PUB GetGain: gain
@@ -214,7 +185,7 @@ PUB GetNPALS_IntThreshReg: threshold | npals_long
 'Gets no-persist ALS threshold values currently set
 ' Bits 31..16: NPAIHTH_NPAIHTL - High threshold word
 '      15..0: NPAILTH_NPAILTL - Low threshold word
-  Command (TSL2591_NPAILTL)
+  Command (tsl2591#REG_NPAILTL)
   ReadLong (@threshold)
 
 PUB GetNPIEN: bool__NP_interrupt_enabled
@@ -233,7 +204,7 @@ PUB GetPersistReg: cycles
 '       0100: 5
 '        .. : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 '       1111: 60
-  Command (TSL2591_PERSIST)
+  Command (tsl2591#REG_PERSIST)
   ReadByte (@cycles) 'No bounds checking/clamping to lower 4 bits...should there be?
 
 PUB GetPackageIDReg: package_id
@@ -241,7 +212,7 @@ PUB GetPackageIDReg: package_id
 ' Bits 7..6: Reserved (should be 0)
 '      5..4: Package ID
 '      3..0: Reserved (should be 0)
-  Command (TSL2591_PID)
+  Command (tsl2591#REG_PID)
   ReadByte (@package_id)
 
 PUB GetPON: pon
@@ -261,7 +232,7 @@ PUB GetStatusReg: dev_status
 '         4: AINT - Indicates ALS interrupt
 '      3..1: Reserved (should be 0)
 '         0: AVALID - Indicates ADCs completed integration cycle since AEN bit was set
-  Command (TSL2591_STATUS)
+  Command (tsl2591#REG_STATUS)
   ReadByte (@dev_status)
 
 PUB IsAValid: bool__adc_valid
@@ -316,7 +287,7 @@ PUB SetALS_IntThreshReg(low_threshold_word, high_threshold_word) | als_long 'XXX
 ' high_threshold_word - high threshold
   if low_threshold_word < 0 or low_threshold_word > 65535 or high_threshold_word < 0 or high_threshold_word > 65535
     return
-  CommandWords (TSL2591_AILTL, high_threshold_word, low_threshold_word)
+  CommandWords (tsl2591#REG_AILTL, high_threshold_word, low_threshold_word)
 
 PUB SetAIntegrationTime(integration_time_ms) | again
 'Sets ADC Integration Time, in ms
@@ -336,7 +307,7 @@ PUB SetControlReg(SRESET, AGAIN, ATIME) | ctrl_byte
 ' ATIME  - ALS Time/ADC Integration time
 
   ctrl_byte := ((SRESET & 1) << 7) | ((AGAIN & 3) << 4) | (ATIME & 5)
-  Command ( TSL2591_CONFIG)
+  Command (tsl2591#REG_CONFIG)
   WriteByte (ctrl_byte)
 
 PUB SetEnableReg(NPIEN, SAI, AIEN, AEN, PON) | ena_byte
@@ -350,7 +321,7 @@ PUB SetEnableReg(NPIEN, SAI, AIEN, AEN, PON) | ena_byte
 '       1: AEN    - ALS Enable
 '       0: PON    - Power On
   ena_byte := ((NPIEN & 1) << 7) | ((SAI & 1) << 6) | ((AIEN & 1) << 4) | ((AEN & 1) << 1) | (PON & 1)
-  Command (TSL2591_ENABLE)
+  Command (tsl2591#REG_ENABLE)
   WriteByte (ena_byte)
 
 PUB SetGainRaw(gain_mode) | atime
@@ -369,7 +340,7 @@ PUB SetNPALS_IntThreshReg(nopersist_low_threshold_word, nopersist_high_threshold
 ' nopersist_high_threshold_word - No-persist high threshold
   if nopersist_low_threshold_word < 0 or nopersist_low_threshold_word > 65535 or nopersist_high_threshold_word < 0 or nopersist_high_threshold_word > 65535
     return
-  CommandWords (TSL2591_NPAILTL, nopersist_high_threshold_word, nopersist_low_threshold_word)
+  CommandWords (tsl2591#REG_NPAILTL, nopersist_high_threshold_word, nopersist_low_threshold_word)
 
 PUB SetNPINT(npi_enabled) | sai, aien, aen, pon
 'Enables or disables No-Persist Interrupts
@@ -397,7 +368,7 @@ PUB SetPersistReg(cycles)
 '       1111: 60
   case cycles
     0..15:
-      Command (TSL2591_PERSIST)
+      Command (tsl2591#REG_PERSIST)
       WriteByte (cycles)
     OTHER:
       return
@@ -424,18 +395,18 @@ PUB SetSpecialFunc(func) | cmd_packet
 ' %01010: Clear No-Persist Interrupt
 '  Other values ignored
   case func
-    TSL2591_CMD_SPECIAL_FORCEINT:
+    tsl2591#SPECFUNC_FORCEINT:
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_SPECIAL) | TSL2591_CMD_SPECIAL_FORCEINT
-    TSL2591_CMD_SPECIAL_CLEARALSINT:
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) | tsl2591#SPECFUNC_FORCEINT
+    tsl2591#SPECFUNC_CLEARALSINT:
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_SPECIAL) | TSL2591_CMD_SPECIAL_CLEARALSINT
-    TSL2591_CMD_SPECIAL_CLEARALS_NOPERSIST_INT:
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) | tsl2591#SPECFUNC_CLEARALSINT
+    tsl2591#SPECFUNC_CLEARALS_NOPERSIST_INT:
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_SPECIAL) | TSL2591_CMD_SPECIAL_CLEARALS_NOPERSIST_INT
-    TSL2591_CMD_SPECIAL_CLEAR_NOPERSIST_INT:
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) | tsl2591#SPECFUNC_CLEARALS_NOPERSIST_INT
+    tsl2591#SPECFUNC_CLEAR_NOPERSIST_INT:
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_SPECIAL) | TSL2591_CMD_SPECIAL_CLEAR_NOPERSIST_INT
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) | tsl2591#SPECFUNC_CLEAR_NOPERSIST_INT
     OTHER:
       return
 
@@ -449,7 +420,7 @@ PUB Command(register) | cmd_packet
   case register
     $00, $01, $04..$0C, $11..$17:
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_NORMAL) | (register & %11111)
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL) | (register & %11111)
     OTHER:
       return
   i2c.start
@@ -463,7 +434,7 @@ PUB CommandWords(register, low_word, high_word) | cmd_packet[2]
   case register
     $04..$0B:     'This method is really only designed for these eight registers, so ignore anything else
       cmd_packet.byte[0] := TSL2591_SLAVE|W
-      cmd_packet.byte[1] := (TSL2591_CMD | TSL2591_CMD_NORMAL) | (register & %11111)
+      cmd_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL) | (register & %11111)
       cmd_packet.word[1] := low_word
       cmd_packet.word[2] := high_word
     OTHER:

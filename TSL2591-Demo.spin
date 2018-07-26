@@ -41,9 +41,9 @@ PUB Main
   TestCONTROL_reg
   TestALSIntThresh_reg
   TestNPALSIntThresh_reg
-  TestPERSIST_reg
+  TestPERSIST_reg}
   TestRO_regs
-}
+
   waitmsg (string("Press any key to begin continuous read of sensor...", ser#NL))
   ser.Clear
 
