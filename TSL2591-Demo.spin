@@ -18,6 +18,7 @@ OBJ
 
   cfg   : "core.con.client.parraldev"
   ser   : "com.serial.terminal"
+  int   : "string.integer"
   time  : "time"
   lux   : "sensor.lux.tsl2591"
   debug : "debug"
@@ -27,242 +28,269 @@ OBJ
 VAR
 
   long _lux_cog
-  long _als_data
-  long ch0, ch1
-  long scale
+  long _ch0, _ch1
+  long _fpscl
+  long _cpl
+  long _ga
 
-PUB Main
+PUB Main | it, g
 
   Setup
-  time.Sleep (1)
-  ser.NewLine
-{  TestENABLE_reg
-  TestCONTROL_reg
-  TestALSIntThresh_reg
-  TestNPALSIntThresh_reg
-  TestPERSIST_reg}
-  TestRO_regs
-
-  waitmsg (string("Press any key to begin continuous read of sensor...", ser#NL))
+  lux.SetIntegrationTime (200)  ' 100-600ms (incr of 100)
+  lux.SetGain (1)               ' 1, 25, 428, 9876
+  waitkey
   ser.Clear
 
-  repeat
-    Test_Luminance
+  _ga := 1                      ' Glass attenuation factor
+  _fpscl := 1000                ' Fixed-point math scaler
+  it := lux.IntegrationTime
+  g := lux.Gain
+  _cpl := it/g                  ' ADC Counts per Lux
 
-PUB TestRO_regs | package_id, device_id, status_reg, als_data
-
-  ser.Str (string("Package ($11) ID: "))
-  ser.Hex (lux.GetPackageIDReg, 8)
-  ser.NewLine
-
-  ser.Str (string("Device ($12) ID: "))
-  ser.Hex (lux.GetDeviceIDReg, 8)
-  ser.NewLine
-
-  ser.Str (string("Status ($13) reg: "))
-  ser.Hex (lux.GetStatusReg, 8)
-  ser.NewLine
-
-  ser.Str (string("ALS Data ($14..$17): "))
-  ser.Hex (lux.GetALSDataReg, 8)
-  ser.NewLine
-
-PUB TestPERSIST_reg | testval, readback
-
-  testval := 3
-
-  ser.Str (string("PERSIST ($0C) register readback test", ser#NL))
-  ser.Str (string("Current settings:", ser#NL))
-  ser.Hex (lux.GetPersistReg, 8)
-  ser.NewLine
-
-  ser.Str (string("About to set:", ser#NL))
-  ser.Hex (testval, 8)
-  ser.NewLine
-  lux.SetPersistReg (testval)
-  readback := lux.GetPersistReg
-
-  ser.Str (string("Readback:", ser#NL))
-  ser.Hex (readback, 8)
-  ser.NewLine
-
-  if readback == testval
-    ser.Str (string("*** PASSED ***", ser#NL))
-  else
-    ser.Str (STRING("*** FAILED ***", ser#NL))
-
-PUB TestNPALSIntThresh_reg | testval, readback
-
-  testval := $DEAD_FACE
-  ser.Str (string("No-persist ALS Interrupt Threshold ($08..$0B) register readback test", ser#NL))
-  ser.Str (string("Current settings: "))
-  ser.Hex (lux.GetNPALS_IntThreshReg, 8)
-  ser.NewLine
-
-  ser.Str (string("About to set: "))
-  ser.Hex (testval, 8)
-  ser.NewLine
-  lux.SetNPALS_IntThreshReg (testval.word[0], testval.word[1])
-  readback := lux.GetNPALS_IntThreshReg
-
-  ser.Str (string("Readback: "))
-  ser.Hex (readback, 8)
-  ser.NewLine
-
-  if readback == testval
-    ser.Str (string("*** PASSED ***", ser#NL))
-  else
-    ser.Str (STRING("*** FAILED ***", ser#NL))
-
-PUB TestALSIntThresh_reg | testval, readback
-
-  testval := $DEAD_BEEF
-  ser.Str (string("ALS Interrupt Threshold ($04..$07) register readback test", ser#NL))
-  ser.Str (string("Current settings: "))
-  ser.Hex (lux.GetALS_IntThreshReg, 8)
-  ser.NewLine
-
-  ser.Str (string("About to set: "))
-  ser.Hex (testval, 8)
-  ser.NewLine
-  lux.SetALS_IntThreshReg (testval.word[0], testval.word[1])
-  readback := lux.GetALS_IntThreshReg
-
-  ser.Str (string("Readback: "))
-  ser.Hex (readback, 8)
-  ser.NewLine
-
-  if readback == testval
-    ser.Str (string("*** PASSED ***", ser#NL))
-  else
-    ser.Str (STRING("*** FAILED ***", ser#NL))
-
-PUB TestCONTROL_reg
-
-  ser.Str (string("CONTROL ($01) register readback test", ser#NL))
-  ser.Str (string("Current settings:", ser#NL))
-  ser.Hex (lux.GetControlReg, 8)
-  ser.NewLine
-  lux.SetControlReg (0, %00, %000)
-  ser.Str (string("Readback:", ser#NL))
-  ser.Hex (lux.GetControlReg, 8)
-  ser.NewLine
-
-PUB TestENABLE_reg
-
-  ser.Str (string("ENABLE ($00) register readback test", ser#NL))
-  ser.Str (string("Current settings:", ser#NL))
-  ser.Str (string("NPIEN: "))
-  ser.Hex (lux.GetNPIEN, 2)'XXX
-  ser.Str (string(" SAI: "))
-  ser.Hex (lux.GetSAI, 2)'XXX
-  ser.Str (string(" AIEN: "))
-  ser.Hex (lux.GetAIEN, 2)'XXX
-  ser.Str (string(" AEN: "))
-  ser.Hex (lux.GetAEN, 2)'XXX
-  ser.Str (string(" PON: "))
-  ser.Hex (lux.GetPON, 2)'XXX
-  ser.NewLine
-
-  lux.SetEnableReg (0, 0, 0, 1, 1)
-
-  ser.Str (string("Readback:", ser#NL))
-  ser.Str (string("NPIEN: "))
-  ser.Hex (lux.GetNPIEN, 2)'XXX
-  ser.Str (string(" SAI: "))
-  ser.Hex (lux.GetSAI, 2)'XXX
-  ser.Str (string(" AIEN: "))
-  ser.Hex (lux.GetAIEN, 2)'XXX
-  ser.Str (string(" AEN: "))
-  ser.Hex (lux.GetAEN, 2)'XXX
-  ser.Str (string(" PON: "))
-  ser.Hex (lux.GetPON, 2)'XXX
-  ser.NewLine
-
-PUB calc_f_Lux: f_lux | f_atime, f_again, f_df, f_ga, f_dgf, f_dim_incan, f_cpl, f_lux1, f_lux2, lux_tmp
-{
-From AMS DN28:
-Data Sheet Lux Equation:
-
-CPL = (ATIME_ms * AGAINx) / (GA * 53)
-Lux1 = (C0DATA – 2 * C1DATA) / CPL
-Lux2 = (0.6 * C0DATA − C1DATA) / CPL
-Lux = MAX(Lux1, Lux2, 0)
-
-Terms:
-CPL = Counts Per Lux
-GA = Glass Attenuation (Open Air = 1.0)
-DF = Device Factor
-DGF = GA * DF
-
-}
-
-  f_atime := 100.0
-  f_again := 1.0
-  f_df := 687.0' 355works for phone under bin..not under shop light (FL)... FL=687
-  f_ga := 1.0
-  f_dgf := math.MulF (f_df, f_ga)
-  f_dim_incan := 0.6
-
-  f_cpl := math.DivF (math.MulF (f_atime, f_again), f_df)
-  f_lux1 := math.DivF (math.SubF (ch0, math.MulF (2.0, ch1)), f_cpl)
-  f_lux2 := math.DivF (math.SubF (math.MulF (f_dim_incan, ch0), ch1), f_cpl)
-  lux_tmp := math.CmpF (f_lux1, f_lux2)
-  case lux_tmp
-    -1:
-'      return fs.FloatToString (f_lux2)
-      lux_tmp := f_lux2
-    0:
-'      return fs.FloatToString (0)
-      lux_tmp := f_lux1
-    1:
-'      return fs.FloatToString (f_lux1)
-      lux_tmp := f_lux1
-    OTHER:
-'      return 0
-
-  case math.CmpF (lux_tmp, 0)
-    -1:
-      return fs.FloatToString (0.0)
-    0:
-      return fs.FloatToString (0.0)
-    1:
-      return fs.FloatToString (lux_tmp)
-
-PUB Test_Luminance
-  
-  _als_data := lux.GetALSDataReg
-  ch0 := math.FloatF (lux.GetALSData_Full)
-  ch1 := math.FloatF (lux.GetALSData_IR)
   ser.Position (0, 0)
-  ser.Str (string("f_Lux: "))
-  ser.Str (calc_f_Lux)
+'                  0    5    10   15   20   25   30   35   40   45   50
+'                  |    |    |    |    |    |    |    |....|....|....|
+  ser.Str (string("Gain: xxxxx    Integration Time: xxxms    CPL: "))
+  ser.Position (6, 0)
+  ser.Str (int.DecPadded (g, 4))
+  ser.Position (33, 0)
+  ser.Dec (it)
+  ser.Position (47, 0)
+  ser.Dec (_cpl)
+
+'  TestIntTime
+'  TestInterrupts
+'  TestPower
+'  TestEnabled
+'  TestGain
+'  TestIntThresholds
+  TestPersistence
+  debug.here (17)
+
+  repeat
+    lux.ReadLightData
+    repeat until lux.LastDataValid
+    _ch0 := lux.FullSpec
+    _ch1 := lux.IR
+    ser.Position (0, 2)
+    ser.Str (int.DecPadded (lux1, 8))
+
+    ser.Position (0, 3)
+    ser.Str (int.DecPadded (lux2, 8))
+    ser.Position (10, 3)
+    ser.Str (int.DecPadded (lux2/_fpscl, 5))
+    ser.Position (15, 3)
+    ser.Char (".")
+    ser.Dec (lux2//_fpscl)
+    ser.Char (" ")
+    time.MSleep (100)
+
+PUB lux2 | ATIME_us, AGAINx
+
+  ATIME_us := lux.IntegrationTime * _fpscl
+  AGAINx := lux.Gain
+
+  return ((_fpscl * _ch0) - ((2 * _fpscl) * _ch1)) / ((ATIME_us * AGAINx) / (_ga * TSL2591_LUX_DF))
+
+PUB lux1 | f, i, cor
+
+  f := lux.FullSpec * _fpscl
+  i := lux.IR * _fpscl
+  cor := f-i
+  cor /= _cpl
+
+PUB TestPersistence | i, lt, ht, thr, pcy, r
+
+  ser.Clear
+  ser.Str (string("Testing persistence thresholds:", ser#NL))
+  ser.Str (string("Setting all thresholds to 0, reading back: "))
+  lux.SetPersistThresh (0, 0)
+  thr := lux.GetPersistThresh
+  lt := thr & $FFFF
+  ht := (thr >> 16) & $FFFF
+  ser.Str (string("Low: "))
+  ser.Str (int.DecZeroed (lt, 5))
+  ser.Str (string(" High: "))
+  ser.Str (int.DecZeroed (ht, 5))
+  if lt == 0 and ht == 0
+    ser.Str (string(", PASSED", ser#NL))
+  else
+    ser.Str (string(", FAILED", ser#NL))
+
+  ser.Str (string("Setting thresholds to Low: 1234, High: 5678, reading back: "))
+  lux.SetPersistThresh (1234, 5678)
+  thr := lux.GetPersistThresh
+  lt := thr & $FFFF
+  ht := (thr >> 16) & $FFFF
+  ser.Str (string("Low: "))
+  ser.Str (int.DecZeroed (lt, 5))
+  ser.Str (string(" High: "))
+  ser.Str (int.DecZeroed (ht, 5))
+  if lt == 1234 and ht == 5678
+    ser.Str (string(", PASSED", ser#NL))
+  else
+    ser.Str (string(", FAILED", ser#NL))
+
+  repeat i from 0 to 15
+    pcy := lookupz(i: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+    ser.Str (string("Setting persist cycles to "))
+    ser.Dec (pcy)
+    lux.SetPersistence (pcy)
+    time.MSleep (1)
+    ser.Str (string(", reading back: "))
+    ser.Dec (r := lux.GetPersistCycles)
+    if r == pcy
+      ser.Str (string(", PASSED", ser#NL))
+    else
+      ser.Str (string(", FAILED", ser#NL))
+
+PUB TestIntThresholds | lt, ht, thr
+
+  ser.Clear
+  ser.Str (string("Testing interrupt thresholds:", ser#NL))
+  ser.Str (string("Setting all thresholds to 0, reading back: "))
+  lux.SetInterruptThresh (0, 0)
+  thr := lux.GetIntThresh
+  lt := thr & $FFFF
+  ht := (thr >> 16) & $FFFF
+  ser.Str (string("Low: "))
+  ser.Str (int.DecZeroed (lt, 5))
+  ser.Str (string(" High: "))
+  ser.Str (int.DecZeroed (ht, 5))
+  if lt == 0 and ht == 0
+    ser.Str (string(", PASSED", ser#NL))
+  else
+    ser.Str (string(", FAILED", ser#NL))
+
+  ser.Str (string("Setting thresholds to Low: 1234, High: 5678, reading back: "))
+  lux.SetInterruptThresh (1234, 5678)
+  thr := lux.GetIntThresh
+  lt := thr & $FFFF
+  ht := (thr >> 16) & $FFFF
+  ser.Str (string("Low: "))
+  ser.Str (int.DecZeroed (lt, 5))
+  ser.Str (string(" High: "))
+  ser.Str (int.DecZeroed (ht, 5))
+  if lt == 1234 and ht == 5678
+    ser.Str (string(", PASSED", ser#NL))
+  else
+    ser.Str (string(", FAILED", ser#NL))
+
+PUB TestGain | i, glut, r 'XXX Test invalid value also?
+
+  ser.Clear
+  repeat i from 0 to 3
+    glut := lookupz(i: 1, 25, 428, 9876)
+    ser.Str (string("Testing gain value of "))
+    ser.Dec (glut)
+    lux.SetGain (glut)
+    ser.Str (string(", readback: "))
+    ser.Dec (r := lux.Gain)
+    if r == glut
+      ser.Str (string(", PASSED", ser#NL))
+    else
+      ser.Str (string(", FAILED", ser#NL))
+
+PUB TestEnabled
+
+  ser.Clear
+  ser.Str (string("Testing ADCs enabled..."))
+  lux.EnableSensor (TRUE)
+  if lux.SensorEnabled
+    ser.Str (string("PASSED", ser#NL))
+  else
+    ser.Str (string("FAILED", ser#NL))
+
+  ser.Str (string("Testing ADCs disabled..."))
+  lux.EnableSensor (FALSE)
+  if lux.SensorEnabled
+    ser.Str (string("FAILED", ser#NL))
+  else
+    ser.Str (string("PASSED", ser#NL))
+
+PUB TestPower
+
+  ser.Clear
+  ser.Str (string("Testing power on..."))
+  lux.PowerOn (TRUE)
+  if lux.IsPowered
+    ser.Str (string("PASSED", ser#NL))
+  else
+    ser.Str (string("FAILED", ser#NL))
+
+  ser.Str (string("Testing power off..."))
+  lux.PowerOn (FALSE)
+  if lux.IsPowered
+    ser.Str (string("FAILED", ser#NL))
+  else
+    ser.Str (string("PASSED", ser#NL))
+
+PUB TestIntTime | i, r
+
+  ser.Clear
+  ser.Str (string("Testing setting of integration time:", ser#NL))
+
+  repeat i from 100 to 600 step 100
+    ser.Position (0, (i/100))
+    ser.Str (string("Setting "))
+    ser.Dec (i)
+    lux.SetIntegrationTime (i)
+    ser.Str (string(", read back: "))
+    r := lux.IntegrationTime
+    ser.Dec (r)
+    if r == i
+      ser.Str (string(", PASSED"))
+    else
+      ser.Str (string(", FAILED"))
+
+PUB TestInterrupts | i, r 'XXX - More comprehensive?
+
+  ser.Clear
+  ser.Str (string("Disabling interrupts", ser#NL))
+  lux.EnableInts (FALSE)
+  ser.Str (string("Clearing interrupts", ser#NL))
+  lux.ClearAllInts
   ser.NewLine
-  time.MSleep (100)
 
+  ser.Str (string("Testing for triggered interrupts..."))
+  if lux.IntTriggered
+    r := (string("FAILED", ser#NL))
+  else
+    r := (string("PASSED", ser#NL))
 
-PUB Setup | lux_found
+  ser.Str (string("Forcing an interrupt", ser#NL))
+  lux.ForceInt
+  ser.Str (string("Testing for triggered interrupts..."))
+  ser.Str (r)
 
-  ser.Start (115_200)
+  if lux.IntTriggered
+    r := (string("PASSED", ser#NL))
+  else
+    r := (string("FAILED", ser#NL))
+  
+PUB Setup
+
+  repeat until ser.Start (115_200)
   ser.Clear
   ser.Str (string("TSL2591 demo", ser#NL))
 
   math.Start
-  fs.SetPrecision (6)
+  fs.SetPrecision (3)
+  ser.Str (string("F32 object started", ser#NL))
+
   _lux_cog := lux.Start-1
-  ser.Str (string("Started tsl2591 object", ser#NL))
+  ser.Str (string("tsl2591 object started...probing for sensor: "))
 
-  lux_found := lux.Probe_TSL2591
-
-  if lux_found
-    ser.Str (string("TSL2591 found!", ser#NL))
+  if lux.Probe_TSL2591
+    ser.Str (string("found!", ser#NL))
   else
-    ser.Str (string("TSL2591 not found - halting!", ser#NL))
+    ser.Str (string("not found - halting!", ser#NL))
     lux.Stop
     ser.Stop
     repeat
 
-  lux.SetEnableReg (0, 0, 0, 1, 1)
+  lux.PowerOn (TRUE)
+  lux.EnableSensor (TRUE)
 
 PUB waitkey
 
