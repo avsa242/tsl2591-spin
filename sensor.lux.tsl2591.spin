@@ -8,13 +8,6 @@
     --------------------------------------------
 }
 'TODO:
-' For Get*/Set* Methods:
-'   - Use CASE for specific allowed values, limit minimum/maximum for sequential ranges (WIP)
-'   - Use proper boolean values for methods that return boolean values (i.e., -1 for TRUE, 0 for FALSE) (WIP)
-'   - Separate methods for
-'     Getting "processed" values, i.e., return parsed units. e.g., GetPersist would return 30 (WIP)
-'     Getting "unprocessed" values, i.e., return raw value from device. e.g., GetPersist_raw might return %1001 (WIP)
-' Break Special Function/Interrupt settings into separate methods (WIP)
 ' Test most/all of these in the demo/test harness
 ' Perhaps most importantly - verify computed lux values in the demo/test harness are reasonably (=?) accurate...need calibrated light meter
 
@@ -86,7 +79,7 @@ PUB DeviceID: device_id
   ReadByte (@device_id)
 
 PUB EnableInts(enabled) | sai, aien, aen, pon
-' Enables or disables No-Persist Interrupts
+' Enables or disables Interrupts
   case ||enabled
     1: enabled <<= 7
     OTHER: enabled := 0
@@ -96,6 +89,18 @@ PUB EnableInts(enabled) | sai, aien, aen, pon
   aen := getField_AEN
   pon := getField_PON
   setReg_ENABLE (enabled, SAI, AIEN, AEN, PON)
+
+PUB EnablePersist(enabled) | sai, npien, aen, pon
+' Enables or disables Interrupts
+  case ||enabled
+    1: enabled <<= 7
+    OTHER: enabled := 0
+
+  npien := getField_NPIEN'quicknote: generic get function that uses constants to extract/set bits
+  sai := getField_SAI
+  aen := getField_AEN
+  pon := getField_PON
+  setReg_ENABLE (NPIEN, SAI, enabled, AEN, PON)
 
 PUB EnableSensor(enabled) | npien, sai, aien, pon
 ' Enable sensor's internal ADCs
@@ -246,14 +251,15 @@ PUB SensorEnabled
 
 PUB SetIntegrationTime(ms) | again
 ' Set the ADC Integration Time, in ms
-' %000  100ms     37888
-' %001  200ms     65535
-' %010  300ms     65535
-' %011  400ms     65535
-' %100  500ms     65535
-' %101  600ms     65535
-  again := getField_AGAIN                        'We're only setting one field in a multi-field register, so we want to
-                                          'preserve the current settings of the other fields not being modified.
+' Time  Value Written   Max ADC count
+' 100ms %000            37888
+' 200ms %001            65535
+' 300ms %010            65535
+' 400ms %011            65535
+' 500ms %100            65535
+' 600ms %101            65535
+  again := getField_AGAIN                       'We're only setting one field in a multi-field register, so we want to
+                                                'preserve the current settings of the other fields not being modified.
   setReg_CONTROL (0, again, lookdownz(ms: 100, 200, 300, 400, 500, 600))
 
 PUB SetPersistThresh(low_threshold_word, high_threshold_word) | als_long
@@ -264,14 +270,13 @@ PUB SetPersistThresh(low_threshold_word, high_threshold_word) | als_long
     return
   CommandWords (tsl2591#REG_AILTL, low_threshold_word, high_threshold_word)
 
-PUB SetGain(gain_mult): atime
+PUB SetGain(gain_mult)
 ' Sets amplifier gain (affects both channels)
 ' * 1x
 '   25x
 '   428x
 '   9876x
-  atime := lookdownz(gain_mult: 1, 25, 428, 9876)
-  setField_AGAIN(atime)'lookdownz(gain_mult: 1, 25, 428, 9876))
+  setField_AGAIN(lookdownz(gain_mult: 1, 25, 428, 9876))
 
 PUB SetInterruptThresh(low_threshold_word, high_threshold_word) | npals_long
 ' Sets no-persist ALS threshold values/registers ($08..$0B)
