@@ -245,30 +245,40 @@ PUB Persistence(cycles) | tmp
     tmp := cycles & core#PERSIST_MASK
     writeRegX (core#TRANS_NORMAL, core#PERSIST, 1, tmp)
 
-PUB PersistIntTriggered
+PUB PersistInt
 ' Indicates if a persistent interrupt has been triggered
-  return ((readReg1 (core#STATUS) >> core#AINT) & %1) * TRUE
-
-PUB PersistThresh: threshold
-' Gets ALS threshold values currently set
-' Bits 31..16: AIHTH_AIHTL - High threshold word
-'      15..0: AILTH_AILTL - Low threshold word
-  return readReg4 (core#AILTL)
+    readRegX (core#STATUS, 1, @result)
+    result := ((result >> core#FLD_AINT) & %1) * TRUE
 
 PUB Reset
 ' Resets the TSL2591
 ' Sets SRESET/System Reset field in CONTROL register. Equivalent to Power-On Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
-'  pokeCONTROL (core#SRESET, 1)
-    writeRegX ( core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
+    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
 
-
-PUB SetPersistThresh(low_threshold, high_threshold) | als_long
+PUB PersistThresh(low_threshold, high_threshold) | tmp
 ' Sets trigger threshold values for persistent ALS interrupts
-  if low_threshold < 0 or low_threshold > 65535 or high_threshold < 0 or high_threshold > 65535
-    return
+'   Valid values for low and high thresholds: 0..65535
+'   Any other value polls the chip and returns the current setting
+'       (high threshold will be returned in upper word of result, low threshold in lower word)
+    readRegX (core#AILTL, 4, @tmp)
+    case low
+        0..65535:
+        OTHER:
+            result.word[0] := tmp.word[0]
 
-  writeReg4 (core#AILTL, (high_threshold << 16) | low_threshold)
+    case high
+        0..65535:
+            high := (high << 16) | low
+        OTHER:
+            result.word[1] := tmp.word[1]
+
+    case result
+        0:
+        OTHER:
+            return result
+
+    writeRegX (core#TRANS_NORMAL, core#AILTL, 4, high)
 
 PUB SleepAfterInt(enabled) | npien, aien, aen, pon
 ' Enable Sleep After Interrupt
