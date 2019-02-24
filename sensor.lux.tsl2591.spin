@@ -51,20 +51,25 @@ PUB Stop
 
 PUB ClearAllInts
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-  specFunc (core#SPECFUNC_CLEARALS_NOPERSIST_INT)
+'  specFunc (core#SPECFUNC_CLEARALS_NOPERSIST_INT)
+    writeRegX (core#TRANS_SPECIAL, core#SF_CLEARALS_NOPERSIST_INT, 0, 0)
 
 PUB ClearInt
 ' Clears NPALS Interrupt
-  specFunc (core#SPECFUNC_CLEAR_NOPERSIST_INT)
+'  specFunc (core#SPECFUNC_CLEAR_NOPERSIST_INT)
+    writeRegX ( core#TRANS_SPECIAL, core#SF_CLEAR_NOPERSIST_INT, 0, 0)
 
 PUB ClearPersistInt
 ' Clears ALS Interrupt
-  specFunc (core#SPECFUNC_CLEARALSINT)
+'  specFunc (core#SPECFUNC_CLEARALSINT)
+    writeRegX ( core#TRANS_SPECIAL, core#SF_CLEARALSINT, 0, 0)
 
-PUB DeviceID: device_id
+PUB DeviceID
 ' Returns contents of Device ID register ($12)
 ' Should return $50
-  device_id := readReg1 (core#ID) & $FF
+'  device_id := readReg1 (core#ID) & $FF
+    readRegX (core#ID, 1, @result)
+    result &= $FF
 
 PUB EnableInts(enabled)
 ' TRUE or 1 enables, FALSE or 0 disables (no-persist) Interrupts
@@ -97,7 +102,8 @@ PUB ForceInt
 ' NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
 '  one of the interrupt enable bits in the ENABLE ($00) register must be set.
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
-  specFunc (core#SPECFUNC_FORCEINT)
+'  specFunc (core#SPECFUNC_FORCEINT)
+    writeRegX ( core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
 PUB Gain
 ' Returns in the current gain setting (multiplier/factor)
@@ -168,7 +174,8 @@ PUB PackageID
 ' Bits 7..6: Reserved (should be 0)
 '      5..4: Package ID (%00)
 '      3..0: Reserved (should be 0)
-  return ((readReg1 (core#PID) >> core#PID) & core#PID_MASK)
+'  return ((readReg1 (core#PID) >> core#PID) & core#PID_MASK)
+    readRegX (core#PID, 1, @result)'reg, nr_bytes, addr_buff)
 
 PUB PersistCycles | tmp
 ' Returns Interrupt persistence filter value
@@ -204,7 +211,8 @@ PUB Reset
 ' Resets the TSL2591
 ' Sets SRESET/System Reset field in CONTROL register. Equivalent to Power-On Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
-  pokeCONTROL (core#SRESET, 1)
+'  pokeCONTROL (core#SRESET, 1)
+    writeRegX ( core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
 
 PUB SetGain(gain_mult)
 ' Sets amplifier gain (affects both channels) 
@@ -362,31 +370,6 @@ PRI pokeENABLE(field, val) | tmp, npien, sai, aien, aen, pon
   tmp := npien | sai | aien | aen | pon
   writeReg1 (core#ENABLE, tmp)
   
-PUB writeRegX(reg, nr_bytes, val) | cmd_packet[2]
-' Write nr_bytes to register 'reg' stored in val
-' If nr_bytes is
-'   0, It's a command that has no arguments - write the command only
-'   1, It's a command with a single byte argument - write the command, then the byte
-'   2, It's a command with two arguments - write the command, then the two bytes (encoded as a word)
-    cmd_packet.byte[0] := SLAVE_WR | _sa0
-    cmd_packet.byte[1] := core#CTRLBYTE_CMD
-    case nr_bytes
-        0:
-            cmd_packet.byte[2] := reg | val 'Simple command
-        1:
-            cmd_packet.byte[2] := reg       'Command w/1-byte argument
-            cmd_packet.byte[3] := val
-        2:
-            cmd_packet.byte[2] := reg       'Command w/2-byte argument
-            cmd_packet.byte[3] := val & $FF
-            cmd_packet.byte[4] := (val >> 8) & $FF
-        OTHER:
-            return
-
-    i2c.start
-    i2c.wr_block (@cmd_packet, 3 + nr_bytes)
-    i2c.stop
-
 PRI readReg1(reg): tmp
 ' Read 1 byte from register 'reg'
   ifnot lookdown(reg: $00, $01, $04..$0C, $11..$17)
@@ -423,6 +406,52 @@ PRI readReg4(reg): tmp | i2c_packet
   i2c.pread (@tmp, 4, TRUE)
   i2c.stop
 
+PUB readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
+'Read nr_bytes from register 'reg' to address 'addr_buff'
+    writeRegX (core#TRANS_NORMAL, reg, 0, 0)
+
+    i2c.start
+    i2c.write (SLAVE_RD)
+    i2c.pread (addr_buff, nr_bytes, TRUE)
+    i2c.stop
+
+PUB writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
+' Write nr_bytes to register 'reg' stored in val
+    cmd_packet.byte[LSB] := SLAVE_WR
+
+    case trans_type
+        core#TRANS_NORMAL:
+            case reg
+                core#ENABLE, core#CONTROL, core#AILTL..core#NPAIHTH, core#PERSIST, core#PID..core#C1DATAH:
+                OTHER:
+                    return
+'            cmd_packet.byte[1] := (core#TSL2591_CMD | trans_type) | reg
+
+        core#TRANS_SPECIAL:
+            case reg
+                core#SF_FORCEINT, core#SF_CLEARALSINT, core#SF_CLEARALS_NOPERSIST_INT, core#SF_CLEAR_NOPERSIST_INT:
+                    nr_bytes := 0
+                    val := 0
+                OTHER:
+                    return
+
+        OTHER:
+            return
+
+    cmd_packet.byte[1] := (core#TSL2591_CMD | trans_type) | reg
+
+    case nr_bytes
+        0:
+        1..4:
+            repeat tmp from 0 to nr_bytes-1
+                cmd_packet.byte[2 + tmp] := val.byte[tmp]
+        OTHER:
+            return
+
+    i2c.start
+    i2c.pwrite (@cmd_packet, 2 + nr_bytes)
+    i2c.stop
+
 PRI writeReg1(reg, val) | i2c_packet
 ' Write 1 byte 'val' to register 'reg'
   i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
@@ -452,20 +481,6 @@ PRI writeReg4(reg, val) | i2c_packet[2]
 
   i2c.start
   i2c.pwrite (@i2c_packet, 6)
-  i2c.stop
-
-PRI specFunc(func) | i2c_packet
-
-  case func
-    core#SPECFUNC_FORCEINT, core#SPECFUNC_CLEARALSINT, core#SPECFUNC_CLEARALS_NOPERSIST_INT, core#SPECFUNC_CLEAR_NOPERSIST_INT:
-      i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
-      i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_SPECIAL) | func '$Ex52
-'      i2c_packet := constant( ((core#TSL2591_CMD | core#TRANS_TYPE_SPECIAL) << 8) | (core#SLAVE_ADDR|W)) | (func << 8) '$Ex52
-    OTHER:
-      return $DEADBEEF
-
-  i2c.start
-  i2c.pwrite (@i2c_packet, 2)
   i2c.stop
 
 DAT

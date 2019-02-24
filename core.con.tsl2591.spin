@@ -78,13 +78,13 @@ CON
 
     TSL2591_CMD                     = %1000_0000' Select Command Register
 
-    TRANS_TYPE_NORMAL               = %0010_0000' Select type of transaction to follow in subsequent data transfers
-    TRANS_TYPE_SPECIAL              = %0110_0000' ( | or together with TSL2591_CMD)
+    TRANS_NORMAL                    = %0010_0000' Select type of transaction to follow in subsequent data transfers
+    TRANS_SPECIAL                   = %0110_0000' ( | or together with TSL2591_CMD)
 
-    SPECFUNC_FORCEINT               =     %00100' Special
-    SPECFUNC_CLEARALSINT            =     %00110' function
-    SPECFUNC_CLEARALS_NOPERSIST_INT =     %00111' fields
-    SPECFUNC_CLEAR_NOPERSIST_INT    =     %01010'  - use if TRANS_TYPE_SPECIAL bits above are set
+    SF_FORCEINT                     =     %00100' Special
+    SF_CLEARALSINT                  =     %00110' function
+    SF_CLEARALS_NOPERSIST_INT       =     %00111' fields
+    SF_CLEAR_NOPERSIST_INT          =     %01010'  - use if TRANS_TYPE_SPECIAL bits above are set
 
 PUB Null
 ' This is not a top-level object
