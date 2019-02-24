@@ -71,13 +71,20 @@ PUB DeviceID
     readRegX (core#ID, 1, @result)
     result &= $FF
 
-PUB EnableInts(enabled)
-' TRUE or 1 enables, FALSE or 0 disables (no-persist) Interrupts
-  case ||enabled
-    0, 1: enabled &= %1
-    OTHER: return
+PUB Interrupts(enabled) | tmp
+' Enable non-persistent interrupts
+'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_NPIEN
+        OTHER:
+            return ((tmp >> core#FLD_NPIEN) & %1) * TRUE
 
-  pokeENABLE ( core#NPIEN, enabled)
+    tmp &= core#MASK_NPIEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB EnablePersist(enabled)
 ' TRUE or 1 enables, FALSE or 0 disables (persistent) Interrupts
@@ -119,10 +126,6 @@ PUB IntegrationTime | tmp
 ' Returns ADC Integration time (both channels)
 ' Queries CONTROL Register and returns ADC Integration time in milliseconds
   return lookupz( (readReg1 (core#CONTROL) >> core#ATIME) & core#ATIME_MASK: 100, 200, 300, 400, 500, 600)
-
-PUB IntsEnabled
-' Returns whether or not (no-persist) interrupts have been enabled
-  return ((readReg1 (core#ENABLE) >> core#NPIEN) & %1) * TRUE
 
 PUB IntTriggered
 ' Indicates if a no-persist interrupt has been triggered
