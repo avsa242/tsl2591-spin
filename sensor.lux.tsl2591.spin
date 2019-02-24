@@ -220,10 +220,11 @@ PUB Luminosity(channel) | tmp
         OTHER:
             return
 
-PUB MeasurementComplete
+PUB MeasComplete
 ' Is ALS data valid?
 ' Indicates ADCs completed integration cycle since AEN bit was set
-  return ((readReg1 (core#STATUS) >> core#AVALID) & %1) * TRUE
+    readRegX (core#STATUS, 1, @result)
+    return ((result >> core#FLD_AVALID) & %1) * TRUE
 
 PUB PackageID
 ' Returns Package ID register ($11)
