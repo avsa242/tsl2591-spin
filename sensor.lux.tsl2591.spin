@@ -99,17 +99,22 @@ PUB PersistInterrupts(enabled) | tmp
 
     tmp &= core#MASK_AIEN
     tmp := (tmp | enabled) & core#ENABLE_MASK
-    writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
-PUB EnableSensor(enabled)
-' Enable sensor's internal ADCs
-' TRUE or 1 activates ADCs
-' FALSE or 0 disables the ADCs
-  case ||enabled
-    0, 1: enabled &= %1
-    OTHER: return
+PUB Sensor(enabled) | tmp
+' Enable ambient light sensor
+'   Valid values: TRUE (1 or -1): sensor enabled, FALSE (0): sensor disabled
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_AEN
+        OTHER:
+            return ((tmp >> core#FLD_AEN) & %1) * TRUE
 
-  pokeENABLE (core#AEN, enabled)
+    tmp &= core#MASK_AEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB ForceInt
 ' Force an ALS Interrupt
@@ -270,10 +275,6 @@ PUB SetPersistThresh(low_threshold, high_threshold) | als_long
     return
 
   writeReg4 (core#AILTL, (high_threshold << 16) | low_threshold)
-
-PUB SensorEnabled
-' Returns whether the sensor ADCs have been enabled
-  return ((readReg1 (core#ENABLE) >> core#AEN) & %1) * TRUE
 
 PUB SleepAfterInt(enabled) | npien, aien, aen, pon
 ' Enable Sleep After Interrupt
