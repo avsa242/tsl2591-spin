@@ -12,65 +12,59 @@
 
 CON
 
-  W                 = %0
-  R                 = %1
-  
-  LSB               = 0
-  SCL               = 28
-  SDA               = 29
-  HZ                = tsl2591#I2C_MAX_RATE
+    SLAVE_WR        = core#SLAVE_ADDR
+    SLAVE_RD        = core#SLAVE_ADDR|1
 
-  #0, GAIN_LOW, GAIN_MED, GAIN_HI, GAIN_MAX             ' Symbolic names for Gain settings
-  #0, FULL, IR, VISIBLE, BOTH                           ' Sensor channel to read
+    DEF_SCL         = 28
+    DEF_SDA         = 29
+    DEF_HZ          = 400_000
+
+    LSB             = 0
+
+    #0, GAIN_LOW, GAIN_MED, GAIN_HI, GAIN_MAX             ' Symbolic names for Gain settings
+    #0, FULL, IR, VISIBLE, BOTH                           ' Sensor channel to read
 
 OBJ
 
-  i2c     : "jm_i2c_fast"
-  tsl2591 : "core.con.tsl2591"
+    i2c     : "jm_i2c_fast"
+    core    : "core.con.tsl2591"
 
 PUB Null
 ' This is not a top-level object
 
 PUB Start: okay                                         ' Default to "standard" Propeller I2C pins and 400kHz
 
-  okay := Startx (SCL, SDA, HZ)
+    okay := Startx (DEF_SCL, DEF_SDA, DEF_HZ)
 
-PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ)
+PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): okay
 
-  if lookdown(SCL_PIN: 0..31)                           ' Validate pins
-    if lookdown(SDA_PIN: 0..31)
-      if SCL_PIN <> SDA_PIN
-        if I2C_HZ =< HZ
-          return i2c.setupx (SCL_PIN, SDA_PIN, I2C_HZ)  ' Start I2C object, return cog num + 1
-        else
-          return FALSE
-      else
-        return FALSE
-    else
-      return FALSE
-  else
+    if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31)
+        if I2C_HZ =< core#I2C_MAX_FREQ
+            if okay := i2c.setupx (SCL_PIN, SDA_PIN, I2C_HZ)
+                if DeviceID == core#DEV_ID_RESP
+                    return okay
     return FALSE
 
 PUB Stop
 ' Kills I2C cog
-  i2c.terminate
+    i2c.terminate
 
 PUB ClearAllInts
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-  specFunc (tsl2591#SPECFUNC_CLEARALS_NOPERSIST_INT)
+  specFunc (core#SPECFUNC_CLEARALS_NOPERSIST_INT)
 
 PUB ClearInt
 ' Clears NPALS Interrupt
-  specFunc (tsl2591#SPECFUNC_CLEAR_NOPERSIST_INT)
+  specFunc (core#SPECFUNC_CLEAR_NOPERSIST_INT)
 
 PUB ClearPersistInt
 ' Clears ALS Interrupt
-  specFunc (tsl2591#SPECFUNC_CLEARALSINT)
+  specFunc (core#SPECFUNC_CLEARALSINT)
 
 PUB DeviceID: device_id
 ' Returns contents of Device ID register ($12)
 ' Should return $50
-  device_id := readReg1 (tsl2591#REG_ID) & $FF
+  device_id := readReg1 (core#ID) & $FF
 
 PUB EnableInts(enabled)
 ' TRUE or 1 enables, FALSE or 0 disables (no-persist) Interrupts
@@ -78,7 +72,7 @@ PUB EnableInts(enabled)
     0, 1: enabled &= %1
     OTHER: return
 
-  pokeReg_ENABLE ( tsl2591#NPIEN, enabled)
+  pokeENABLE ( core#NPIEN, enabled)
 
 PUB EnablePersist(enabled)
 ' TRUE or 1 enables, FALSE or 0 disables (persistent) Interrupts
@@ -86,7 +80,7 @@ PUB EnablePersist(enabled)
     0, 1: enabled &= %1
     OTHER: return
 
-  pokeReg_ENABLE (tsl2591#AIEN, enabled)
+  pokeENABLE (core#AIEN, enabled)
 
 PUB EnableSensor(enabled)
 ' Enable sensor's internal ADCs
@@ -96,41 +90,41 @@ PUB EnableSensor(enabled)
     0, 1: enabled &= %1
     OTHER: return
 
-  pokeReg_ENABLE (tsl2591#AEN, enabled)
+  pokeENABLE (core#AEN, enabled)
 
 PUB ForceInt
 ' Force an ALS Interrupt
 ' NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
 '  one of the interrupt enable bits in the ENABLE ($00) register must be set.
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
-  specFunc (tsl2591#SPECFUNC_FORCEINT)
+  specFunc (core#SPECFUNC_FORCEINT)
 
 PUB Gain
 ' Returns in the current gain setting (multiplier/factor)
-  return lookupz(readReg1 (tsl2591#REG_CONTROL) >> tsl2591#AGAIN: 1, 25, 428, 9876)
+  return lookupz(readReg1 (core#CONTROL) >> core#AGAIN: 1, 25, 428, 9876)
 
 PUB GetIntThresh
 ' Gets no-persist ALS threshold values currently set
 ' Bits 31..16: NPAIHTH_NPAIHTL - High threshold word
 '      15..0: NPAILTH_NPAILTL - Low threshold word
-  return readReg4 (tsl2591#REG_NPAILTL)
+  return readReg4 (core#NPAILTL)
 
 PUB IntegrationTime | tmp
 ' Returns ADC Integration time (both channels)
 ' Queries CONTROL Register and returns ADC Integration time in milliseconds
-  return lookupz( (readReg1 (tsl2591#REG_CONTROL) >> tsl2591#ATIME) & tsl2591#ATIME_MASK: 100, 200, 300, 400, 500, 600)
+  return lookupz( (readReg1 (core#CONTROL) >> core#ATIME) & core#ATIME_MASK: 100, 200, 300, 400, 500, 600)
 
 PUB IntsEnabled
 ' Returns whether or not (no-persist) interrupts have been enabled
-  return ((readReg1 (tsl2591#REG_ENABLE) >> tsl2591#NPIEN) & %1) * TRUE
+  return ((readReg1 (core#ENABLE) >> core#NPIEN) & %1) * TRUE
 
 PUB IntTriggered
 ' Indicates if a no-persist interrupt has been triggered
-  return ((readReg1 (tsl2591#REG_STATUS) >> tsl2591#NPINTR) & %1) * TRUE
+  return ((readReg1 (core#STATUS) >> core#NPINTR) & %1) * TRUE
 
 PUB IsPowered
 ' Indicates if the sensor is powered on
-  return ((readReg1 (tsl2591#REG_ENABLE) >> tsl2591#PON) & %1) * TRUE
+  return ((readReg1 (core#ENABLE) >> core#PON) & %1) * TRUE
 
 PUB Luminosity(channel) | tmp
 ' Get luminosity data from sensor
@@ -141,21 +135,21 @@ PUB Luminosity(channel) | tmp
   case channel
     %00:
       tmp := 0
-      tmp := readReg2 (tsl2591#REG_C0DATAL)
+      tmp := readReg2 (core#C0DATAL)
       return tmp
     ' Reads ALS data from channel 0 (Full spectrum)
 
     %01:
-      return readReg2 (tsl2591#REG_C1DATAL)
+      return readReg2 (core#C1DATAL)
     ' Reads ALS data from channel 1 (IR)
     
     %10:
-      tmp := readReg4 (tsl2591#REG_C0DATAL)
+      tmp := readReg4 (core#C0DATAL)
       return tmp.word[0] - tmp.word[1]
     ' Reads ALS data from both channels (returns Visible only)
 
     %11:
-      return readReg4 (tsl2591#REG_C0DATAL)
+      return readReg4 (core#C0DATAL)
 
     ' Reads ALS data from both channels (returns both channels)
     ' Bits 31..16/Most-significant word contain the IR data
@@ -166,7 +160,7 @@ PUB Luminosity(channel) | tmp
 PUB MeasurementComplete
 ' Is ALS data valid?
 ' Indicates ADCs completed integration cycle since AEN bit was set
-  return ((readReg1 (tsl2591#REG_STATUS) >> tsl2591#AVALID) & %1) * TRUE
+  return ((readReg1 (core#STATUS) >> core#AVALID) & %1) * TRUE
 
 PUB PackageID
 ' Returns Package ID register ($11)
@@ -174,26 +168,26 @@ PUB PackageID
 ' Bits 7..6: Reserved (should be 0)
 '      5..4: Package ID (%00)
 '      3..0: Reserved (should be 0)
-  return ((readReg1 (tsl2591#PID) >> tsl2591#PID) & tsl2591#PID_MASK)
+  return ((readReg1 (core#PID) >> core#PID) & core#PID_MASK)
 
 PUB PersistCycles | tmp
 ' Returns Interrupt persistence filter value
 ' Queries the PERSIST register and returns the number of consecutive cycles necessary to generate an interrupt
-  return lookupz(readReg1 (tsl2591#REG_PERSIST) & tsl2591#APERS_MASK: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+  return lookupz(readReg1 (core#PERSIST) & core#APERS_MASK: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
 
 PUB PersistEnabled
 ' Indicates if Persistent interrupts are enabled
-  return ((readReg1 (tsl2591#REG_ENABLE) >> tsl2591#AIEN) & %1) * TRUE
+  return ((readReg1 (core#ENABLE) >> core#AIEN) & %1) * TRUE
 
 PUB PersistIntTriggered
 ' Indicates if a persistent interrupt has been triggered
-  return ((readReg1 (tsl2591#REG_STATUS) >> tsl2591#AINT) & %1) * TRUE
+  return ((readReg1 (core#STATUS) >> core#AINT) & %1) * TRUE
 
 PUB PersistThresh: threshold
 ' Gets ALS threshold values currently set
 ' Bits 31..16: AIHTH_AIHTL - High threshold word
 '      15..0: AILTH_AILTL - Low threshold word
-  return readReg4 (tsl2591#REG_AILTL)
+  return readReg4 (core#AILTL)
 
 PUB PowerOn(power) | npien, sai, aien, aen
 ' Power ON
@@ -204,13 +198,13 @@ PUB PowerOn(power) | npien, sai, aien, aen
     0, 1: power &= %1
     OTHER: return
 
-  pokeReg_ENABLE (tsl2591#PON, power)
+  pokeENABLE (core#PON, power)
 
 PUB Reset
 ' Resets the TSL2591
 ' Sets SRESET/System Reset field in CONTROL register. Equivalent to Power-On Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
-  pokeReg_CONTROL (tsl2591#SRESET, 1)
+  pokeCONTROL (core#SRESET, 1)
 
 PUB SetGain(gain_mult)
 ' Sets amplifier gain (affects both channels) 
@@ -221,7 +215,7 @@ PUB SetGain(gain_mult)
   ifnot lookdown(gain_mult: 1, 25, 428, 9876)
     return $DEADBEEF
 
-  pokeReg_CONTROL (tsl2591#AGAIN, lookdownz(gain_mult: 1, 25, 428, 9876))
+  pokeCONTROL (core#AGAIN, lookdownz(gain_mult: 1, 25, 428, 9876))
 
 PUB SetIntegrationTime(ms)
 ' Set the ADC Integration Time, in ms
@@ -235,14 +229,14 @@ PUB SetIntegrationTime(ms)
   ifnot lookdown(ms: 100, 200, 300, 400, 500, 600)
     return $DEADBEEF
 
-  writeReg1 (tsl2591#REG_CONTROL, lookdownz(ms: 100, 200, 300, 400, 500, 600))
+  writeReg1 (core#CONTROL, lookdownz(ms: 100, 200, 300, 400, 500, 600))
 
 PUB SetInterruptThresh(low_threshold, high_threshold) | npals_long
 ' Sets trigger threshold values for no-persist ALS interrupts (registers $08..$0B)
   if low_threshold < 0 or low_threshold > 65535 or high_threshold < 0 or high_threshold > 65535
     return
 
-  writeReg4 (tsl2591#REG_NPAILTL, (high_threshold << 16) | low_threshold)
+  writeReg4 (core#NPAILTL, (high_threshold << 16) | low_threshold)
 
 PUB SetPersistence(cycles)
 ' Sets Persist register ($0C)
@@ -254,18 +248,18 @@ PUB SetPersistence(cycles)
 '       4       : ...5 consecutive values
 '       5 .. 14 : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 '       15      : 60
-  writeReg1 (tsl2591#REG_PERSIST, lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60))
+  writeReg1 (core#PERSIST, lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60))
 
 PUB SetPersistThresh(low_threshold, high_threshold) | als_long
 ' Sets trigger threshold values for persistent ALS interrupts
   if low_threshold < 0 or low_threshold > 65535 or high_threshold < 0 or high_threshold > 65535
     return
 
-  writeReg4 (tsl2591#REG_AILTL, (high_threshold << 16) | low_threshold)
+  writeReg4 (core#AILTL, (high_threshold << 16) | low_threshold)
 
 PUB SensorEnabled
 ' Returns whether the sensor ADCs have been enabled
-  return ((readReg1 (tsl2591#REG_ENABLE) >> tsl2591#AEN) & %1) * TRUE
+  return ((readReg1 (core#ENABLE) >> core#AEN) & %1) * TRUE
 
 PUB SleepAfterInt(enabled) | npien, aien, aen, pon
 ' Enable Sleep After Interrupt
@@ -274,109 +268,134 @@ PUB SleepAfterInt(enabled) | npien, aien, aen, pon
     0, 1: enabled &= %1
     OTHER: return
 
-  pokeReg_ENABLE ( tsl2591#SAI, enabled)
+  pokeENABLE ( core#SAI, enabled)
 
 PUB SleepingAfterInt
 ' Indicates if the sensor will sleep after an interrupt is triggered
-  return ((readReg1 (tsl2591#REG_ENABLE) >> tsl2591#SAI) & %1) * TRUE
+  return ((readReg1 (core#ENABLE) >> core#SAI) & %1) * TRUE
 
-PRI pokeReg_CONTROL(field, val) | reg_tmp, sreset, again, atime
+PRI pokeCONTROL(field, val) | tmp, sreset, again, atime
 ' Read, modify fields, write byte back to CONTROL register
-  reg_tmp := 0
+  tmp := 0
   sreset := 0 
   again := 0
   atime := 0
 ' Get current state:
-  reg_tmp := readReg1 (tsl2591#REG_CONTROL) 
+  tmp := readReg1 (core#CONTROL) 
 ' The SRESET field is here too, but don't bother reading it; it should never read as set
-  again := (reg_tmp >> tsl2591#AGAIN) & tsl2591#AGAIN_MASK
-  atime := reg_tmp & tsl2591#ATIME_MASK
+  again := (tmp >> core#AGAIN) & core#AGAIN_MASK
+  atime := tmp & core#ATIME_MASK
 
   case field
-    tsl2591#SRESET:
-      sreset := val << tsl2591#SRESET
+    core#SRESET:
+      sreset := val << core#SRESET
 ' If we're resetting, we don't care about preserving the other two fields
 '   they'll be wiped after reset, anyway
 
-    tsl2591#AGAIN:
-      again := (val <# %11) << tsl2591#AGAIN
+    core#AGAIN:
+      again := (val <# %11) << core#AGAIN
       atime := atime <# %101
  
-    tsl2591#ATIME:
-      again := again << tsl2591#AGAIN
+    core#ATIME:
+      again := again << core#AGAIN
       atime := val <# %101
 
     OTHER:
       return $DEADBEEF
 
-  reg_tmp := (sreset | again | atime) & $FF
-  writeReg1 (tsl2591#REG_CONTROL, reg_tmp)
-  return reg_tmp
+  tmp := (sreset | again | atime) & $FF
+  writeReg1 (core#CONTROL, tmp)
+  return tmp
 
-PRI pokeReg_ENABLE(field, val) | reg_tmp, npien, sai, aien, aen, pon
+PRI pokeENABLE(field, val) | tmp, npien, sai, aien, aen, pon
 ' Read, modify fields, write byte back to ENABLE register
-  reg_tmp := 0
+  tmp := 0
   npien := 0
   sai := 0
   aien := 0
   aen := 0
   pon := 0
 ' Get current state:
-  reg_tmp := readReg1 (tsl2591#REG_ENABLE)
-  npien := (reg_tmp >> tsl2591#NPIEN)  & %1
-  sai   := (reg_tmp >> tsl2591#SAI)    & %1
-  aien  := (reg_tmp >> tsl2591#AIEN)   & %1
-  aen   := (reg_tmp >> tsl2591#AEN)    & %1
-  pon   := (reg_tmp >> tsl2591#PON)    & %1
+  tmp := readReg1 (core#ENABLE)
+  npien := (tmp >> core#NPIEN)  & %1
+  sai   := (tmp >> core#SAI)    & %1
+  aien  := (tmp >> core#AIEN)   & %1
+  aen   := (tmp >> core#AEN)    & %1
+  pon   := (tmp >> core#PON)    & %1
 
   case field
-    tsl2591#NPIEN:
-      npien := val << tsl2591#NPIEN
-      sai   := sai << tsl2591#SAI
-      aien  := aien << tsl2591#AIEN
-      aen   := aen << tsl2591#AEN
-      pon   := pon << tsl2591#PON
+    core#NPIEN:
+      npien := val << core#NPIEN
+      sai   := sai << core#SAI
+      aien  := aien << core#AIEN
+      aen   := aen << core#AEN
+      pon   := pon << core#PON
 
-    tsl2591#SAI:
-      sai := val << tsl2591#SAI
-      npien := npien << tsl2591#NPIEN
-      aien  := aien << tsl2591#AIEN
-      aen   := aen << tsl2591#AEN
-      pon   := pon << tsl2591#PON
+    core#SAI:
+      sai := val << core#SAI
+      npien := npien << core#NPIEN
+      aien  := aien << core#AIEN
+      aen   := aen << core#AEN
+      pon   := pon << core#PON
 
-    tsl2591#AIEN:
-      aien := val << tsl2591#AIEN
-      npien := npien << tsl2591#NPIEN
-      sai   := sai << tsl2591#SAI
-      aen   := aen << tsl2591#AEN
-      pon   := pon << tsl2591#PON
+    core#AIEN:
+      aien := val << core#AIEN
+      npien := npien << core#NPIEN
+      sai   := sai << core#SAI
+      aen   := aen << core#AEN
+      pon   := pon << core#PON
 
-    tsl2591#AEN:
-      aen := val << tsl2591#AEN
-      npien := npien << tsl2591#NPIEN
-      sai   := sai << tsl2591#SAI
-      aien  := aien << tsl2591#AIEN
-      pon   := pon << tsl2591#PON
+    core#AEN:
+      aen := val << core#AEN
+      npien := npien << core#NPIEN
+      sai   := sai << core#SAI
+      aien  := aien << core#AIEN
+      pon   := pon << core#PON
 
-    tsl2591#PON:
+    core#PON:
       pon := val
-      npien := npien << tsl2591#NPIEN
-      sai   := sai << tsl2591#SAI
-      aien  := aien << tsl2591#AIEN
-      aen   := aen << tsl2591#AEN
+      npien := npien << core#NPIEN
+      sai   := sai << core#SAI
+      aien  := aien << core#AIEN
+      aen   := aen << core#AEN
 
-  reg_tmp := npien | sai | aien | aen | pon
-  writeReg1 (tsl2591#REG_ENABLE, reg_tmp)
+  tmp := npien | sai | aien | aen | pon
+  writeReg1 (core#ENABLE, tmp)
   
+PUB writeRegX(reg, nr_bytes, val) | cmd_packet[2]
+' Write nr_bytes to register 'reg' stored in val
+' If nr_bytes is
+'   0, It's a command that has no arguments - write the command only
+'   1, It's a command with a single byte argument - write the command, then the byte
+'   2, It's a command with two arguments - write the command, then the two bytes (encoded as a word)
+    cmd_packet.byte[0] := SLAVE_WR | _sa0
+    cmd_packet.byte[1] := core#CTRLBYTE_CMD
+    case nr_bytes
+        0:
+            cmd_packet.byte[2] := reg | val 'Simple command
+        1:
+            cmd_packet.byte[2] := reg       'Command w/1-byte argument
+            cmd_packet.byte[3] := val
+        2:
+            cmd_packet.byte[2] := reg       'Command w/2-byte argument
+            cmd_packet.byte[3] := val & $FF
+            cmd_packet.byte[4] := (val >> 8) & $FF
+        OTHER:
+            return
+
+    i2c.start
+    i2c.wr_block (@cmd_packet, 3 + nr_bytes)
+    i2c.stop
+
 PRI readReg1(reg): tmp
 ' Read 1 byte from register 'reg'
   ifnot lookdown(reg: $00, $01, $04..$0C, $11..$17)
     return $DEADBEEF
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|W)
-  i2c.write (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL | reg)
+  i2c.write (core#SLAVE_ADDR|W)
+  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|R)
+  i2c.write (core#SLAVE_ADDR|R)
   tmp := (i2c.read (TRUE)) & $FF
   i2c.stop
 
@@ -385,10 +404,10 @@ PRI readReg2(reg): tmp
   ifnot lookdown(reg: $04, $06, $08, $0A, $14, $16)
     return $DEADBEEF
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|W)
-  i2c.write (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL | reg)
+  i2c.write (core#SLAVE_ADDR|W)
+  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|R)
+  i2c.write (core#SLAVE_ADDR|R)
   i2c.pread (@tmp, 2, TRUE)
   i2c.stop
 
@@ -397,17 +416,17 @@ PRI readReg4(reg): tmp | i2c_packet
   ifnot lookdown(reg: $04, $08, $14)
     return $DEADBEEF
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|W)
-  i2c.write (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL | reg)
+  i2c.write (core#SLAVE_ADDR|W)
+  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
   i2c.start
-  i2c.write (tsl2591#SLAVE_ADDR|R)
+  i2c.write (core#SLAVE_ADDR|R)
   i2c.pread (@tmp, 4, TRUE)
   i2c.stop
 
 PRI writeReg1(reg, val) | i2c_packet
 ' Write 1 byte 'val' to register 'reg'
-  i2c_packet.byte[LSB] := tsl2591#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL) | reg
+  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
+  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
   i2c_packet.byte[2] := val
 
   i2c.start
@@ -416,8 +435,8 @@ PRI writeReg1(reg, val) | i2c_packet
 
 PRI writeReg2(reg, val) | i2c_packet
 ' Write 2 bytes 'val' starting with register 'reg'
-  i2c_packet.byte[LSB] := tsl2591#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL) | reg
+  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
+  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
   i2c_packet.byte[2] := val & $FFFF
 
   i2c.start
@@ -426,8 +445,8 @@ PRI writeReg2(reg, val) | i2c_packet
 
 PRI writeReg4(reg, val) | i2c_packet[2]
 ' Write 4 bytes 'val' starting with register 'reg'
-  i2c_packet.byte[LSB] := tsl2591#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_NORMAL) | reg
+  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
+  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
   i2c_packet.word[1] := val & $FFFF
   i2c_packet.word[2] := (val >> 16) & $FFFF
 
@@ -438,10 +457,10 @@ PRI writeReg4(reg, val) | i2c_packet[2]
 PRI specFunc(func) | i2c_packet
 
   case func
-    tsl2591#SPECFUNC_FORCEINT, tsl2591#SPECFUNC_CLEARALSINT, tsl2591#SPECFUNC_CLEARALS_NOPERSIST_INT, tsl2591#SPECFUNC_CLEAR_NOPERSIST_INT:
-      i2c_packet.byte[LSB] := tsl2591#SLAVE_ADDR|W
-      i2c_packet.byte[1] := (tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) | func '$Ex52
-'      i2c_packet := constant( ((tsl2591#TSL2591_CMD | tsl2591#TRANS_TYPE_SPECIAL) << 8) | (tsl2591#SLAVE_ADDR|W)) | (func << 8) '$Ex52
+    core#SPECFUNC_FORCEINT, core#SPECFUNC_CLEARALSINT, core#SPECFUNC_CLEARALS_NOPERSIST_INT, core#SPECFUNC_CLEAR_NOPERSIST_INT:
+      i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
+      i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_SPECIAL) | func '$Ex52
+'      i2c_packet := constant( ((core#TSL2591_CMD | core#TRANS_TYPE_SPECIAL) << 8) | (core#SLAVE_ADDR|W)) | (func << 8) '$Ex52
     OTHER:
       return $DEADBEEF
 
