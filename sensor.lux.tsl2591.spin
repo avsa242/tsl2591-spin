@@ -86,13 +86,20 @@ PUB Interrupts(enabled) | tmp
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
-PUB EnablePersist(enabled)
-' TRUE or 1 enables, FALSE or 0 disables (persistent) Interrupts
-  case ||enabled
-    0, 1: enabled &= %1
-    OTHER: return
+PUB PersistInterrupts(enabled) | tmp
+' Enable persistent interrupts
+'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_AIEN
+        OTHER:
+            return ((tmp >> core#FLD_AIEN) & %1) * TRUE
 
-  pokeENABLE (core#AIEN, enabled)
+    tmp &= core#MASK_AIEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB EnableSensor(enabled)
 ' Enable sensor's internal ADCs
@@ -184,10 +191,6 @@ PUB PersistCycles | tmp
 ' Returns Interrupt persistence filter value
 ' Queries the PERSIST register and returns the number of consecutive cycles necessary to generate an interrupt
   return lookupz(readReg1 (core#PERSIST) & core#APERS_MASK: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
-
-PUB PersistEnabled
-' Indicates if Persistent interrupts are enabled
-  return ((readReg1 (core#ENABLE) >> core#AIEN) & %1) * TRUE
 
 PUB PersistIntTriggered
 ' Indicates if a persistent interrupt has been triggered
