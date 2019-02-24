@@ -201,34 +201,24 @@ PUB Power(enabled) | tmp
 
 PUB Luminosity(channel) | tmp
 ' Get luminosity data from sensor
-' %00 - Full spectrum
-' %01 - IR
-' %10 - Visible
-' %11 - Both (see comments for case %11)
-  case channel
-    %00:
-      tmp := 0
-      tmp := readReg2 (core#C0DATAL)
-      return tmp
-    ' Reads ALS data from channel 0 (Full spectrum)
-
-    %01:
-      return readReg2 (core#C1DATAL)
-    ' Reads ALS data from channel 1 (IR)
-    
-    %10:
-      tmp := readReg4 (core#C0DATAL)
-      return tmp.word[0] - tmp.word[1]
-    ' Reads ALS data from both channels (returns Visible only)
-
-    %11:
-      return readReg4 (core#C0DATAL)
-
-    ' Reads ALS data from both channels (returns both channels)
-    ' Bits 31..16/Most-significant word contain the IR data
-    ' Bits 15..0/Least-significant word contain the Full-spectrum light data
-    
-    OTHER: return
+'   Valid values:
+'       %00 - Full spectrum
+'       %01 - IR
+'       %10 - Visible
+'       %11 - Both (most-significant word: IR, least-signficant word: Full-spectrum)
+'   Any other values ignored
+    readRegX (core#C0DATAL, 4, @tmp)
+    case channel
+        %00:
+            return tmp.word[0] & $FFFF
+        %01:
+            return tmp.word[1] & $FFFF
+        %10:
+            return (tmp.word[0] - tmp.word[1]) & $FFFF
+        %11:
+            return tmp
+        OTHER:
+            return
 
 PUB MeasurementComplete
 ' Is ALS data valid?
