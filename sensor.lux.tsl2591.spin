@@ -256,7 +256,7 @@ PUB Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
     writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
 
-PUB PersistThresh(low_threshold, high_threshold) | tmp
+PUB PersistThresh(low, high) | tmp
 ' Sets trigger threshold values for persistent ALS interrupts
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
@@ -280,144 +280,22 @@ PUB PersistThresh(low_threshold, high_threshold) | tmp
 
     writeRegX (core#TRANS_NORMAL, core#AILTL, 4, high)
 
-PUB SleepAfterInt(enabled) | npien, aien, aen, pon
+PUB SleepAfterInt(enabled) | tmp
 ' Enable Sleep After Interrupt
-' TRUE or 1 enables, FALSE or 0 disables Sleeping after an Interrupt is asserted
-  case ||enabled
-    0, 1: enabled &= %1
-    OTHER: return
+'   Valid values: TRUE (1 or -1): enable, FALSE (0): disable
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_SAI
+        OTHER:
+            return ((tmp >> core#FLD_SAI) & %1) * TRUE
 
-  pokeENABLE ( core#SAI, enabled)
+    tmp &= core#MASK_SAI
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
-PUB SleepingAfterInt
-' Indicates if the sensor will sleep after an interrupt is triggered
-  return ((readReg1 (core#ENABLE) >> core#SAI) & %1) * TRUE
-
-PRI pokeCONTROL(field, val) | tmp, sreset, again, atime
-' Read, modify fields, write byte back to CONTROL register
-  tmp := 0
-  sreset := 0 
-  again := 0
-  atime := 0
-' Get current state:
-  tmp := readReg1 (core#CONTROL) 
-' The SRESET field is here too, but don't bother reading it; it should never read as set
-  again := (tmp >> core#AGAIN) & core#AGAIN_MASK
-  atime := tmp & core#ATIME_MASK
-
-  case field
-    core#SRESET:
-      sreset := val << core#SRESET
-' If we're resetting, we don't care about preserving the other two fields
-'   they'll be wiped after reset, anyway
-
-    core#AGAIN:
-      again := (val <# %11) << core#AGAIN
-      atime := atime <# %101
- 
-    core#ATIME:
-      again := again << core#AGAIN
-      atime := val <# %101
-
-    OTHER:
-      return $DEADBEEF
-
-  tmp := (sreset | again | atime) & $FF
-  writeReg1 (core#CONTROL, tmp)
-  return tmp
-
-PRI pokeENABLE(field, val) | tmp, npien, sai, aien, aen, pon
-' Read, modify fields, write byte back to ENABLE register
-  tmp := 0
-  npien := 0
-  sai := 0
-  aien := 0
-  aen := 0
-  pon := 0
-' Get current state:
-  tmp := readReg1 (core#ENABLE)
-  npien := (tmp >> core#NPIEN)  & %1
-  sai   := (tmp >> core#SAI)    & %1
-  aien  := (tmp >> core#AIEN)   & %1
-  aen   := (tmp >> core#AEN)    & %1
-  pon   := (tmp >> core#PON)    & %1
-
-  case field
-    core#NPIEN:
-      npien := val << core#NPIEN
-      sai   := sai << core#SAI
-      aien  := aien << core#AIEN
-      aen   := aen << core#AEN
-      pon   := pon << core#PON
-
-    core#SAI:
-      sai := val << core#SAI
-      npien := npien << core#NPIEN
-      aien  := aien << core#AIEN
-      aen   := aen << core#AEN
-      pon   := pon << core#PON
-
-    core#AIEN:
-      aien := val << core#AIEN
-      npien := npien << core#NPIEN
-      sai   := sai << core#SAI
-      aen   := aen << core#AEN
-      pon   := pon << core#PON
-
-    core#AEN:
-      aen := val << core#AEN
-      npien := npien << core#NPIEN
-      sai   := sai << core#SAI
-      aien  := aien << core#AIEN
-      pon   := pon << core#PON
-
-    core#PON:
-      pon := val
-      npien := npien << core#NPIEN
-      sai   := sai << core#SAI
-      aien  := aien << core#AIEN
-      aen   := aen << core#AEN
-
-  tmp := npien | sai | aien | aen | pon
-  writeReg1 (core#ENABLE, tmp)
-  
-PRI readReg1(reg): tmp
-' Read 1 byte from register 'reg'
-  ifnot lookdown(reg: $00, $01, $04..$0C, $11..$17)
-    return $DEADBEEF
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|W)
-  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|R)
-  tmp := (i2c.read (TRUE)) & $FF
-  i2c.stop
-
-PRI readReg2(reg): tmp
-' Read 2 bytes starting from register 'reg'
-  ifnot lookdown(reg: $04, $06, $08, $0A, $14, $16)
-    return $DEADBEEF
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|W)
-  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|R)
-  i2c.pread (@tmp, 2, TRUE)
-  i2c.stop
-
-PRI readReg4(reg): tmp | i2c_packet
-' Read 4 bytes starting from register 'reg'
-  ifnot lookdown(reg: $04, $08, $14)
-    return $DEADBEEF
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|W)
-  i2c.write (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL | reg)
-  i2c.start
-  i2c.write (core#SLAVE_ADDR|R)
-  i2c.pread (@tmp, 4, TRUE)
-  i2c.stop
-
-PUB readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
+PRI readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
 'Read nr_bytes from register 'reg' to address 'addr_buff'
     writeRegX (core#TRANS_NORMAL, reg, 0, 0)
 
@@ -426,7 +304,7 @@ PUB readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
     i2c.pread (addr_buff, nr_bytes, TRUE)
     i2c.stop
 
-PUB writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
+PRI writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
 ' Write nr_bytes to register 'reg' stored in val
     cmd_packet.byte[LSB] := SLAVE_WR
 
@@ -462,37 +340,6 @@ PUB writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
     i2c.start
     i2c.pwrite (@cmd_packet, 2 + nr_bytes)
     i2c.stop
-
-PRI writeReg1(reg, val) | i2c_packet
-' Write 1 byte 'val' to register 'reg'
-  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
-  i2c_packet.byte[2] := val
-
-  i2c.start
-  i2c.pwrite (@i2c_packet, 3)
-  i2c.stop
-
-PRI writeReg2(reg, val) | i2c_packet
-' Write 2 bytes 'val' starting with register 'reg'
-  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
-  i2c_packet.byte[2] := val & $FFFF
-
-  i2c.start
-  i2c.pwrite (@i2c_packet, 4)
-  i2c.stop
-
-PRI writeReg4(reg, val) | i2c_packet[2]
-' Write 4 bytes 'val' starting with register 'reg'
-  i2c_packet.byte[LSB] := core#SLAVE_ADDR|W
-  i2c_packet.byte[1] := (core#TSL2591_CMD | core#TRANS_TYPE_NORMAL) | reg
-  i2c_packet.word[1] := val & $FFFF
-  i2c_packet.word[2] := (val >> 16) & $FFFF
-
-  i2c.start
-  i2c.pwrite (@i2c_packet, 6)
-  i2c.stop
 
 DAT
 {
