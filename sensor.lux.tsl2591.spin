@@ -179,13 +179,25 @@ PUB IntegrationTime(time_ms) | tmp
     tmp := (tmp | time_ms) & core#CONTROL_MASK
     writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
-PUB IntTriggered
-' Indicates if a no-persist interrupt has been triggered
-  return ((readReg1 (core#STATUS) >> core#NPINTR) & %1) * TRUE
+PUB Interrupt
+' Indicates if a non-persistent interrupt has been triggered
+    readRegX (core#STATUS, 1, @result)
+    result := ((result >> core#FLD_NPINTR) & %1) * TRUE
 
-PUB IsPowered
-' Indicates if the sensor is powered on
-  return ((readReg1 (core#ENABLE) >> core#PON) & %1) * TRUE
+PUB Power(enabled) | tmp
+' Enable sensor power
+'   Valid values: TRUE (1 or -1): power on, FALSE (0): power off
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled
+        OTHER:
+            return (tmp & %1) * TRUE
+
+    tmp &= core#MASK_PON
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB Luminosity(channel) | tmp
 ' Get luminosity data from sensor
@@ -246,17 +258,6 @@ PUB PersistThresh: threshold
 ' Bits 31..16: AIHTH_AIHTL - High threshold word
 '      15..0: AILTH_AILTL - Low threshold word
   return readReg4 (core#AILTL)
-
-PUB PowerOn(power) | npien, sai, aien, aen
-' Power ON
-'  1 or TRUE activates the sensor's internal oscillator
-'  0 or FALSE disables the oscillator/powers down
-'  anything else is ignored
-  case ||power
-    0, 1: power &= %1
-    OTHER: return
-
-  pokeENABLE (core#PON, power)
 
 PUB Reset
 ' Resets the TSL2591
