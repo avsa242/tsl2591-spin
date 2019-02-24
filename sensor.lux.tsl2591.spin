@@ -139,16 +139,45 @@ PUB Gain(multiplier) | tmp
     tmp := (tmp | multiplier) & core#CONTROL_MASK
     writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
-PUB GetIntThresh
-' Gets no-persist ALS threshold values currently set
-' Bits 31..16: NPAIHTH_NPAIHTL - High threshold word
-'      15..0: NPAILTH_NPAILTL - Low threshold word
-  return readReg4 (core#NPAILTL)
+PUB IntThresh(low, high) | tmp
+' Set non-persistent interrupt thresholds
+'   Valid values for low and high thresholds: 0..65535
+'   Any other value polls the chip and returns the current setting
+'       (high threshold will be returned in upper word of result, low threshold in lower word)
+    readRegX (core#NPAILTL, 4, @tmp)
+    case low
+        0..65535:
+        OTHER:
+            result.word[0] := tmp.word[0]
 
-PUB IntegrationTime | tmp
-' Returns ADC Integration time (both channels)
-' Queries CONTROL Register and returns ADC Integration time in milliseconds
-  return lookupz( (readReg1 (core#CONTROL) >> core#ATIME) & core#ATIME_MASK: 100, 200, 300, 400, 500, 600)
+    case high
+        0..65535:
+            high := (high << 16) | low
+        OTHER:
+            result.word[1] := tmp.word[1]
+
+    case result
+        0:
+        OTHER:
+            return result
+
+    writeRegX (core#TRANS_NORMAL, core#NPAILTL, 4, high)', reg, nr_bytes, val)
+
+PUB IntegrationTime(time_ms) | tmp
+' Set ADC Integration time, in milliseconds (affects both photodiode channels)
+'   Valid values: 100, 200, 300, 400, 500, 600
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#CONTROL, 1, @tmp)
+    case time_ms
+        100, 200, 300, 400, 500, 600:
+            time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
+        OTHER:
+            result := tmp & core#BITS_ATIME
+            return lookupz(result: 100, 200, 300, 400, 500, 600)
+
+    tmp &= core#MASK_ATIME
+    tmp := (tmp | time_ms) & core#CONTROL_MASK
+    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
 PUB IntTriggered
 ' Indicates if a no-persist interrupt has been triggered
@@ -235,27 +264,6 @@ PUB Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
 '  pokeCONTROL (core#SRESET, 1)
     writeRegX ( core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
-
-PUB SetIntegrationTime(ms)
-' Set the ADC Integration Time, in ms
-' Time  Value Written   Max ADC count
-' 100ms %000            37888
-' 200ms %001            65535
-' 300ms %010            65535
-' 400ms %011            65535
-' 500ms %100            65535
-' 600ms %101            65535
-  ifnot lookdown(ms: 100, 200, 300, 400, 500, 600)
-    return $DEADBEEF
-
-  writeReg1 (core#CONTROL, lookdownz(ms: 100, 200, 300, 400, 500, 600))
-
-PUB SetInterruptThresh(low_threshold, high_threshold) | npals_long
-' Sets trigger threshold values for no-persist ALS interrupts (registers $08..$0B)
-  if low_threshold < 0 or low_threshold > 65535 or high_threshold < 0 or high_threshold > 65535
-    return
-
-  writeReg4 (core#NPAILTL, (high_threshold << 16) | low_threshold)
 
 PUB SetPersistence(cycles)
 ' Sets Persist register ($0C)
