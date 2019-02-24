@@ -40,24 +40,24 @@ PUB Main | it, g, i, r
 
   Setup
   ser.NewLine
-  ser.Str (string("IsPowered: "))
-  ser.Hex (lux.IsPowered, 8)
+  ser.Str (string("Powered: "))
+  ser.Hex (lux.Power (-2), 8)
   ser.NewLine
-  ser.Str (string("SensorEnabled: "))
-  ser.Hex (lux.SensorEnabled, 8)
+  ser.Str (string("Sensor Enabled: "))
+  ser.Hex ( lux.Sensor (-2), 8)
   ser.NewLine
   lux.Reset
-  lux.SetGain (1)               ' 1, 25, 428, 9876
-  lux.SetIntegrationTime (200)
-  lux.PowerOn (TRUE)
-  lux.EnableSensor (TRUE)
+  lux.Gain (1)               ' 1, 25, 428, 9876
+  lux.IntegrationTime (200)
+  lux.Power (TRUE)
+  lux.Sensor (TRUE)
   waitkey
   ser.Clear
   
   _ga := 1                      ' Glass attenuation factor
   _fpscl := 1000                ' Fixed-point math scaler
-  it := lux.IntegrationTime
-  g := lux.Gain
+  it := lux.IntegrationTime (-2)
+  g := lux.Gain(-2)
   _cpl := it/g                  ' ADC Counts per Lux
 
   ser.Position (0, 0)
@@ -75,7 +75,7 @@ PUB Main | it, g, i, r
 
   repeat
 '    lux.ReadLightData
-    repeat until lux.MeasurementComplete
+    repeat until lux.MeasComplete
     _ch0 := lux.Luminosity (2)
     _ch1 := lux.Luminosity (1)
     ser.Position (0, 2)
@@ -97,8 +97,8 @@ PUB Main | it, g, i, r
 
 PUB lux2 | ATIME_us, AGAINx
 
-  ATIME_us := lux.IntegrationTime * _fpscl
-  AGAINx := lux.Gain
+  ATIME_us := lux.IntegrationTime (-2) * _fpscl
+  AGAINx := lux.Gain(-2)
 
   return ((_fpscl * _ch0) - ((2 * _fpscl) * _ch1)) / ((ATIME_us * AGAINx) / (_ga * TSL2591_LUX_DF))
 

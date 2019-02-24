@@ -133,7 +133,8 @@ PUB Gain(multiplier) | tmp
         1, 25, 428, 9876:
             multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#FLD_AGAIN
         OTHER:
-            return (tmp >> core#FLD_AGAIN) & core#BITS_AGAIN
+            result := (tmp >> core#FLD_AGAIN) & core#BITS_AGAIN
+            return lookupz(result: 1, 25, 428, 9876)
 
     tmp &= core#MASK_AGAIN
     tmp := (tmp | multiplier) & core#CONTROL_MASK
