@@ -221,7 +221,6 @@ PUB Luminosity(channel) | tmp
             return
 
 PUB MeasComplete
-' Is ALS data valid?
 ' Indicates ADCs completed integration cycle since AEN bit was set
     readRegX (core#STATUS, 1, @result)
     return ((result >> core#FLD_AVALID) & %1) * TRUE
@@ -229,16 +228,22 @@ PUB MeasComplete
 PUB PackageID
 ' Returns Package ID register ($11)
 ' Should always return $00
-' Bits 7..6: Reserved (should be 0)
-'      5..4: Package ID (%00)
-'      3..0: Reserved (should be 0)
-'  return ((readReg1 (core#PID) >> core#PID) & core#PID_MASK)
     readRegX (core#PID, 1, @result)'reg, nr_bytes, addr_buff)
 
-PUB PersistCycles | tmp
-' Returns Interrupt persistence filter value
+PUB Persistence(cycles) | tmp
+' Set Interrupt persistence filter value
 ' Queries the PERSIST register and returns the number of consecutive cycles necessary to generate an interrupt
-  return lookupz(readReg1 (core#PERSIST) & core#APERS_MASK: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+'   Valid values:
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#PERSIST, 1, @tmp)
+    case cycles
+        0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
+            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+        OTHER:
+            return tmp & core#BITS_APERS
+
+    tmp := cycles & core#PERSIST_MASK
+    writeRegX (core#TRANS_NORMAL, core#PERSIST, 1, tmp)
 
 PUB PersistIntTriggered
 ' Indicates if a persistent interrupt has been triggered
@@ -257,17 +262,6 @@ PUB Reset
 '  pokeCONTROL (core#SRESET, 1)
     writeRegX ( core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
 
-PUB SetPersistence(cycles)
-' Sets Persist register ($0C)
-' Sets number of consecutive out-of-range ALS cycles necessary to generate an interrupt
-'       0       : Generate interrupt every ALS cycle, regardless if it's outside threshold range or not
-'       1       : Generate interrupt anytime value goes outside threshold range/Out Of Range
-'       2       : Generate interrupt when there have been 2 consecutive values OOR
-'       3       : Generate interrupt when there have been 3 consecutive values OOR
-'       4       : ...5 consecutive values
-'       5 .. 14 : 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
-'       15      : 60
-  writeReg1 (core#PERSIST, lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60))
 
 PUB SetPersistThresh(low_threshold, high_threshold) | als_long
 ' Sets trigger threshold values for persistent ALS interrupts
