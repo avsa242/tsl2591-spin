@@ -124,9 +124,20 @@ PUB ForceInt
 '  specFunc (core#SPECFUNC_FORCEINT)
     writeRegX ( core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
-PUB Gain
-' Returns in the current gain setting (multiplier/factor)
-  return lookupz(readReg1 (core#CONTROL) >> core#AGAIN: 1, 25, 428, 9876)
+PUB Gain(multiplier) | tmp
+' Set gain multiplier/factor
+'   Valid values: 1, 25, 428, 9876
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#CONTROL, 1, @tmp)
+    case multiplier
+        1, 25, 428, 9876:
+            multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#FLD_AGAIN
+        OTHER:
+            return (tmp >> core#FLD_AGAIN) & core#BITS_AGAIN
+
+    tmp &= core#MASK_AGAIN
+    tmp := (tmp | multiplier) & core#CONTROL_MASK
+    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
 PUB GetIntThresh
 ' Gets no-persist ALS threshold values currently set
@@ -224,17 +235,6 @@ PUB Reset
 ' Field is self-clearing (i.e., once reset, it will be set back to 0)
 '  pokeCONTROL (core#SRESET, 1)
     writeRegX ( core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
-
-PUB SetGain(gain_mult)
-' Sets amplifier gain (affects both channels) 
-' * 1x
-'   25x
-'   428x
-'   9876x
-  ifnot lookdown(gain_mult: 1, 25, 428, 9876)
-    return $DEADBEEF
-
-  pokeCONTROL (core#AGAIN, lookdownz(gain_mult: 1, 25, 428, 9876))
 
 PUB SetIntegrationTime(ms)
 ' Set the ADC Integration Time, in ms
