@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2018
     Started Feb 17, 2018
-    Updated Feb 24, 2019
+    Updated Feb 25, 2019
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -50,78 +50,28 @@ PUB Stop
     i2c.terminate
 
 PUB ClearAllInts
-' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-'  specFunc (core#SPECFUNC_CLEARALS_NOPERSIST_INT)
+' Clears both persistent and non-persistent interrupt flags
     writeRegX (core#TRANS_SPECIAL, core#SF_CLEARALS_NOPERSIST_INT, 0, 0)
 
 PUB ClearInt
-' Clears NPALS Interrupt
-'  specFunc (core#SPECFUNC_CLEAR_NOPERSIST_INT)
+' Clears only the non-persistent interrupt flag
     writeRegX ( core#TRANS_SPECIAL, core#SF_CLEAR_NOPERSIST_INT, 0, 0)
 
 PUB ClearPersistInt
-' Clears ALS Interrupt
-'  specFunc (core#SPECFUNC_CLEARALSINT)
+' Clears only the persistent interrupt flag
     writeRegX ( core#TRANS_SPECIAL, core#SF_CLEARALSINT, 0, 0)
 
 PUB DeviceID
 ' Returns contents of Device ID register ($12)
-' Should return $50
-'  device_id := readReg1 (core#ID) & $FF
+'   Returns: $50
     readRegX (core#ID, 1, @result)
     result &= $FF
-
-PUB Interrupts(enabled) | tmp
-' Enable non-persistent interrupts
-'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
-'   Any other value polls the chip and returns the current setting
-    readRegX (core#ENABLE, 1, @tmp)
-    case ||enabled
-        0, 1:
-            enabled := ||enabled << core#FLD_NPIEN
-        OTHER:
-            return ((tmp >> core#FLD_NPIEN) & %1) * TRUE
-
-    tmp &= core#MASK_NPIEN
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
-
-PUB PersistInterrupts(enabled) | tmp
-' Enable persistent interrupts
-'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
-'   Any other value polls the chip and returns the current setting
-    readRegX (core#ENABLE, 1, @tmp)
-    case ||enabled
-        0, 1:
-            enabled := ||enabled << core#FLD_AIEN
-        OTHER:
-            return ((tmp >> core#FLD_AIEN) & %1) * TRUE
-
-    tmp &= core#MASK_AIEN
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
-
-PUB Sensor(enabled) | tmp
-' Enable ambient light sensor
-'   Valid values: TRUE (1 or -1): sensor enabled, FALSE (0): sensor disabled
-'   Any other value polls the chip and returns the current setting
-    readRegX (core#ENABLE, 1, @tmp)
-    case ||enabled
-        0, 1:
-            enabled := ||enabled << core#FLD_AEN
-        OTHER:
-            return ((tmp >> core#FLD_AEN) & %1) * TRUE
-
-    tmp &= core#MASK_AEN
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB ForceInt
 ' Force an ALS Interrupt
 ' NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
 '  one of the interrupt enable bits in the ENABLE ($00) register must be set.
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
-'  specFunc (core#SPECFUNC_FORCEINT)
     writeRegX ( core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
 PUB Gain(multiplier) | tmp
@@ -139,6 +89,42 @@ PUB Gain(multiplier) | tmp
     tmp &= core#MASK_AGAIN
     tmp := (tmp | multiplier) & core#CONTROL_MASK
     writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
+
+PUB IntegrationTime(time_ms) | tmp
+' Set ADC Integration time, in milliseconds (affects both photodiode channels)
+'   Valid values: 100, 200, 300, 400, 500, 600
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#CONTROL, 1, @tmp)
+    case time_ms
+        100, 200, 300, 400, 500, 600:
+            time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
+        OTHER:
+            result := tmp & core#BITS_ATIME
+            return lookupz(result: 100, 200, 300, 400, 500, 600)
+
+    tmp &= core#MASK_ATIME
+    tmp := (tmp | time_ms) & core#CONTROL_MASK
+    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
+
+PUB Interrupt
+' Indicates if a non-persistent interrupt has been triggered
+    readRegX (core#STATUS, 1, @result)
+    result := ((result >> core#FLD_NPINTR) & %1) * TRUE
+
+PUB Interrupts(enabled) | tmp
+' Enable non-persistent interrupts
+'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_NPIEN
+        OTHER:
+            return ((tmp >> core#FLD_NPIEN) & %1) * TRUE
+
+    tmp &= core#MASK_NPIEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB IntThresh(low, high) | tmp
 ' Set non-persistent interrupt thresholds
@@ -164,42 +150,6 @@ PUB IntThresh(low, high) | tmp
 
     writeRegX (core#TRANS_NORMAL, core#NPAILTL, 4, high)', reg, nr_bytes, val)
 
-PUB IntegrationTime(time_ms) | tmp
-' Set ADC Integration time, in milliseconds (affects both photodiode channels)
-'   Valid values: 100, 200, 300, 400, 500, 600
-'   Any other value polls the chip and returns the current setting
-    readRegX (core#CONTROL, 1, @tmp)
-    case time_ms
-        100, 200, 300, 400, 500, 600:
-            time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
-        OTHER:
-            result := tmp & core#BITS_ATIME
-            return lookupz(result: 100, 200, 300, 400, 500, 600)
-
-    tmp &= core#MASK_ATIME
-    tmp := (tmp | time_ms) & core#CONTROL_MASK
-    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
-
-PUB Interrupt
-' Indicates if a non-persistent interrupt has been triggered
-    readRegX (core#STATUS, 1, @result)
-    result := ((result >> core#FLD_NPINTR) & %1) * TRUE
-
-PUB Power(enabled) | tmp
-' Enable sensor power
-'   Valid values: TRUE (1 or -1): power on, FALSE (0): power off
-'   Any other value polls the chip and returns the current setting
-    readRegX (core#ENABLE, 1, @tmp)
-    case ||enabled
-        0, 1:
-            enabled := ||enabled
-        OTHER:
-            return (tmp & %1) * TRUE
-
-    tmp &= core#MASK_PON
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
-
 PUB Luminosity(channel) | tmp
 ' Get luminosity data from sensor
 '   Valid values:
@@ -222,18 +172,33 @@ PUB Luminosity(channel) | tmp
             return
 
 PUB MeasComplete
-' Indicates ADCs completed integration cycle since AEN bit was set
+' Indicates sensor's ADCs have completed an integration cycle since they were enabled
     readRegX (core#STATUS, 1, @result)
     return ((result >> core#FLD_AVALID) & %1) * TRUE
 
+PUB PersistInterrupts(enabled) | tmp
+' Enable persistent interrupts
+'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_AIEN
+        OTHER:
+            return ((tmp >> core#FLD_AIEN) & %1) * TRUE
+
+    tmp &= core#MASK_AIEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+
 PUB PackageID
-' Returns Package ID register ($11)
-' Should always return $00
-    readRegX (core#PID, 1, @result)'reg, nr_bytes, addr_buff)
+' Package ID
+'   Returns: $00
+    readRegX (core#PID, 1, @result)
 
 PUB Persistence(cycles) | tmp
-' Set Interrupt persistence filter value
-' Queries the PERSIST register and returns the number of consecutive cycles necessary to generate an interrupt
+' Set Interrupt persistence filter value, in cycles
+' (Number of consecutive cycles the interrupt threshold is crossed before an interrupt is generated)
 '   Valid values:
 '   Any other value polls the chip and returns the current setting
     readRegX (core#PERSIST, 1, @tmp)
@@ -251,14 +216,8 @@ PUB PersistInt
     readRegX (core#STATUS, 1, @result)
     result := ((result >> core#FLD_AINT) & %1) * TRUE
 
-PUB Reset
-' Resets the TSL2591
-' Sets SRESET/System Reset field in CONTROL register. Equivalent to Power-On Reset
-' Field is self-clearing (i.e., once reset, it will be set back to 0)
-    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
-
 PUB PersistThresh(low, high) | tmp
-' Sets trigger threshold values for persistent ALS interrupts
+' Sets trigger threshold values for persistent interrupts
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
 '       (high threshold will be returned in upper word of result, low threshold in lower word)
@@ -281,8 +240,43 @@ PUB PersistThresh(low, high) | tmp
 
     writeRegX (core#TRANS_NORMAL, core#AILTL, 4, high)
 
+PUB Power(enabled) | tmp
+' Enable sensor power
+'   Valid values: TRUE (1 or -1): power on, FALSE (0): power off
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled
+        OTHER:
+            return (tmp & %1) * TRUE
+
+    tmp &= core#MASK_PON
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+
+PUB Reset
+' Resets the TSL2591
+' NOTE: Equivalent to Power-On Reset
+    writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
+
+PUB Sensor(enabled) | tmp
+' Enable ambient light sensor
+'   Valid values: TRUE (1 or -1): sensor enabled, FALSE (0): sensor disabled
+'   Any other value polls the chip and returns the current setting
+    readRegX (core#ENABLE, 1, @tmp)
+    case ||enabled
+        0, 1:
+            enabled := ||enabled << core#FLD_AEN
+        OTHER:
+            return ((tmp >> core#FLD_AEN) & %1) * TRUE
+
+    tmp &= core#MASK_AEN
+    tmp := (tmp | enabled) & core#ENABLE_MASK
+    writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+
 PUB SleepAfterInt(enabled) | tmp
-' Enable Sleep After Interrupt
+' Sleep After Interrupt occurs
 '   Valid values: TRUE (1 or -1): enable, FALSE (0): disable
 '   Any other value polls the chip and returns the current setting
     readRegX (core#ENABLE, 1, @tmp)
@@ -306,7 +300,8 @@ PRI readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
     i2c.stop
 
 PRI writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
-' Write nr_bytes to register 'reg' stored in val
+' Write nr_bytes of 'val to register 'reg'
+'   or perform special functions
     cmd_packet.byte[LSB] := SLAVE_WR
 
     case trans_type
@@ -315,7 +310,6 @@ PRI writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
                 core#ENABLE, core#CONTROL, core#AILTL..core#NPAIHTH, core#PERSIST, core#PID..core#C1DATAH:
                 OTHER:
                     return
-'            cmd_packet.byte[1] := (core#TSL2591_CMD | trans_type) | reg
 
         core#TRANS_SPECIAL:
             case reg

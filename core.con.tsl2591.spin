@@ -16,7 +16,7 @@ CON
     SLAVE_ADDR                      = $29 << 1  ' Hardcoded - no address option for this device
     DEV_ID_RESP                     = $50
 
-' Registers (fields within registers are indented)
+' TSL2591 Registers
     ENABLE                          = $00
     ENABLE_MASK                     = $D3
         FLD_NPIEN                   = 7         ' No-Persist Interrupts Enabled
