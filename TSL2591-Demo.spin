@@ -3,7 +3,7 @@
     Filename: TSL2591-Demo.spin
     Description: Demo for the TSL2591 driver
     Author: Jesse Burt
-    Copyright (c) 2018
+    Copyright (c) 2019
     Started Feb 17, 2018
     Updated Feb 24, 2019
     See end of file for terms of use.

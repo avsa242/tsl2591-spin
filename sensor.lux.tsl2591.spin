@@ -3,7 +3,7 @@
     Filename: sensor.lux.tsl2591.spin
     Description: Driver for the TSL2591 I2C Light/lux sensor
     Author: Jesse Burt
-    Copyright (c) 2018
+    Copyright (c) 2019
     Started Feb 17, 2018
     Updated Feb 25, 2019
     See end of file for terms of use.

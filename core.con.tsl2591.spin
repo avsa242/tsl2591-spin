@@ -3,7 +3,7 @@
     Filename: core.con.tsl2591.spin
     Description: TSL2591 low-level constants
     Author: Jesse Burt
-    Copyright (c) 2018
+    Copyright (c) 2019
     Started Feb 17, 2018
     Updated Feb 24, 2019
     See end of file for terms of use.
