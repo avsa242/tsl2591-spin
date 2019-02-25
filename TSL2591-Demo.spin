@@ -24,13 +24,11 @@ OBJ
     int   : "string.integer"
     time  : "time"
     lux   : "sensor.lux.tsl2591"
-    debug : "debug"
-    math  : "math.float"
-    fs    : "string.float"
+'    math  : "math.float"
+'    fs    : "string.float"
 
 VAR
 
-    long _lux_cog
     long _ch0, _ch1
     long _fpscl
     long _cpl
@@ -39,18 +37,13 @@ VAR
 PUB Main | it, g, i, r
 
     Setup
-    ser.NewLine
-    ser.Str (string("Powered: "))
-    ser.Hex (lux.Power (-2), 8)
-    ser.NewLine
-    ser.Str (string("Sensor Enabled: "))
-    ser.Hex ( lux.Sensor (-2), 8)
-    ser.NewLine
+
     lux.Reset
     lux.Gain (1)               ' 1, 25, 428, 9876
     lux.IntegrationTime (200)
     lux.Power (TRUE)
     lux.Sensor (TRUE)
+    ser.NewLine
     waitkey
     ser.Clear
 
@@ -61,8 +54,8 @@ PUB Main | it, g, i, r
     _cpl := it/g                  ' ADC Counts per Lux
 
     ser.Position (0, 0)
-    '                  0    5    10   15   20   25   30   35   40   45   50
-    '                  |    |    |    |    |    |    |    |....|....|....|
+    '                0    5    10   15   20   25   30   35   40   45   50
+    '                |    |    |    |    |    |    |    |....|....|....|
     ser.Str (string("Gain: xxxxx    Integration Time: xxxms    CPL: "))
     ser.Position (6, 0)
     ser.Str (int.DecPadded (g, 4))
@@ -71,29 +64,30 @@ PUB Main | it, g, i, r
     ser.Position (47, 0)
     ser.Dec (_cpl)
 
-    '  debug.here (17)
-
     repeat
-'    lux.ReadLightData
         repeat until lux.MeasComplete
-        _ch0 := lux.Luminosity (2)
-        _ch1 := lux.Luminosity (1)
+'        _ch0 := lux.Luminosity (2)
+'        _ch1 := lux.Luminosity (1)
+{
         ser.Position (0, 2)
         ser.Hex (_ch0, 4)
         ser.Position (0, 3)
         ser.Hex (_ch1, 4)
-
-{    ser.Str (int.DecPadded (lux1, 8))
-
-    ser.Position (0, 3)
-    ser.Str (int.DecPadded (lux2, 8))
-    ser.Position (10, 3)
-    ser.Str (int.DecPadded (lux2/_fpscl, 5))
-    ser.Position (15, 3)
-    ser.Char (".")
-    ser.Dec (lux2//_fpscl)
-    ser.Char (" ")}
         time.MSleep (100)
+}
+
+        ser.Position (0, 3)
+        ser.Str (int.DecPadded (lux1, 8))
+
+{        ser.Str (int.DecPadded (lux2, 8))
+        ser.Position (10, 3)
+        ser.Str (int.DecPadded (lux2/_fpscl, 5))
+        ser.Position (15, 3)
+        ser.Char (".")
+        ser.Dec (lux2//_fpscl)
+        ser.Char (" ")}
+        time.MSleep (100)
+
 
 PUB lux2 | ATIME_us, AGAINx
 
@@ -104,31 +98,34 @@ PUB lux2 | ATIME_us, AGAINx
 
 PUB lux1 | f, i, cor
 
-    f := lux.Luminosity (0) * _fpscl
-    i := lux.Luminosity (1) * _fpscl
-    cor := f-i
-    cor /= _cpl
+'    f := lux.Luminosity (0) * _fpscl
+'    i := lux.Luminosity (1) * _fpscl
+'    cor := f-i
+    return lux.Luminosity (2)/_cpl
 
 PUB Setup
 
     repeat until ser.Start (115_200)
     ser.Clear
-    ser.Str (string("TSL2591 demo", ser#NL))
-
-    math.Start
-    fs.SetPrecision (3)
-    ser.Str (string("F32 object started", ser#NL))
-
-    _lux_cog := lux.Start
-    ser.Str (string("tsl2591 object started on cog "))
-    ser.Dec (_lux_cog-1)
-    ser.Str (string(", probing for sensor..."))
-
-    if \lux.DeviceID == $50
-        ser.Str (string("found!", ser#NL))
+    ser.Str (string("Serial terminal started", ser#NL))
+{
+    if math.Start
+        fs.SetPrecision (3)
+        ser.Str (string("F32 object started", ser#NL))
     else
-        ser.Str (string("not found - halting!", ser#NL))
-        time.MSleep (500)
+        ser.Str (string("F32 object failed to start", ser#NL))
+        time.MSleep (1)
+        math.Stop
+        lux.Stop
+        ser.Stop
+        repeat
+}
+    if lux.Start
+        ser.Str (string("tsl2591 object started"))
+    else
+        ser.Str (string("tsl2591 object failed to start", ser#NL))
+        time.MSleep (1)
+        'math.Stop
         lux.Stop
         ser.Stop
         repeat
