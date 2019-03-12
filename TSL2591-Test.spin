@@ -14,7 +14,7 @@ CON
 
 OBJ
 
-  cfg   : "core.con.client.flip"
+  cfg   : "core.con.boardcfg.flip"
   ser   : "com.serial.terminal"
   int   : "string.integer"
   time  : "time"

@@ -51,23 +51,19 @@ PUB Stop
 
 PUB ClearAllInts
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-'  specFunc (core#SPECFUNC_CLEARALS_NOPERSIST_INT)
     writeRegX (core#TRANS_SPECIAL, core#SF_CLEARALS_NOPERSIST_INT, 0, 0)
 
 PUB ClearInt
 ' Clears NPALS Interrupt
-'  specFunc (core#SPECFUNC_CLEAR_NOPERSIST_INT)
     writeRegX ( core#TRANS_SPECIAL, core#SF_CLEAR_NOPERSIST_INT, 0, 0)
 
 PUB ClearPersistInt
 ' Clears ALS Interrupt
-'  specFunc (core#SPECFUNC_CLEARALSINT)
     writeRegX ( core#TRANS_SPECIAL, core#SF_CLEARALSINT, 0, 0)
 
 PUB DeviceID
 ' Returns contents of Device ID register ($12)
-' Should return $50
-'  device_id := readReg1 (core#ID) & $FF
+' Returns: $50
     readRegX (core#ID, 1, @result)
     result &= $FF
 
@@ -121,7 +117,6 @@ PUB ForceInt
 ' NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
 '  one of the interrupt enable bits in the ENABLE ($00) register must be set.
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
-'  specFunc (core#SPECFUNC_FORCEINT)
     writeRegX ( core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
 PUB Gain(multiplier) | tmp
@@ -162,7 +157,7 @@ PUB IntThresh(low, high) | tmp
         OTHER:
             return result
 
-    writeRegX (core#TRANS_NORMAL, core#NPAILTL, 4, high)', reg, nr_bytes, val)
+    writeRegX (core#TRANS_NORMAL, core#NPAILTL, 4, high)
 
 PUB IntegrationTime(time_ms) | tmp
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
@@ -227,9 +222,9 @@ PUB MeasComplete
     return ((result >> core#FLD_AVALID) & %1) * TRUE
 
 PUB PackageID
-' Returns Package ID register ($11)
-' Should always return $00
-    readRegX (core#PID, 1, @result)'reg, nr_bytes, addr_buff)
+' Returns Package ID
+' Returns: $00
+    readRegX (core#PID, 1, @result)
 
 PUB Persistence(cycles) | tmp
 ' Set Interrupt persistence filter value
@@ -254,7 +249,7 @@ PUB PersistInt
 PUB Reset
 ' Resets the TSL2591
 ' Sets SRESET/System Reset field in CONTROL register. Equivalent to Power-On Reset
-' Field is self-clearing (i.e., once reset, it will be set back to 0)
+' Field is self-clearing (i.e., once reset, it will read back as 0)
     writeRegX (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
 
 PUB PersistThresh(low, high) | tmp
