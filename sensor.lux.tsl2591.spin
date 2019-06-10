@@ -26,7 +26,7 @@ CON
 
 OBJ
 
-    i2c     : "jm_i2c_fast"
+    i2c     : "com.i2c"
     core    : "core.con.tsl2591"
 
 PUB Null
@@ -297,7 +297,7 @@ PRI readRegX(reg, nr_bytes, addr_buff) | cmd_packet[2], ackbit
 
     i2c.start
     i2c.write (SLAVE_RD)
-    i2c.pread (addr_buff, nr_bytes, TRUE)
+    i2c.rd_block (addr_buff, nr_bytes, TRUE)
     i2c.stop
 
 PRI writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
@@ -334,7 +334,7 @@ PRI writeRegX(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
             return
 
     i2c.start
-    i2c.pwrite (@cmd_packet, 2 + nr_bytes)
+    i2c.wr_block (@cmd_packet, 2 + nr_bytes)
     i2c.stop
 
 DAT
