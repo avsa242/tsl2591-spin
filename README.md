@@ -23,5 +23,6 @@ This is a P8X32A/Propeller driver object for the AMS TSL2591 Lux Sensor.
 
 ## TODO
 
-- [ ] Clean up the demo object
+- [x] Clean up the demo object
 - [ ] Verify luminosity readings against certified/calibrated device
+- [ ] Implement better/multiple LUX calculations

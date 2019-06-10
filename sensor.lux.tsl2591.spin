@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2018
     Started Feb 17, 2018
-    Updated Feb 24, 2019
+    Updated Jun 10, 2019
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -23,6 +23,11 @@ CON
 
     #0, GAIN_LOW, GAIN_MED, GAIN_HI, GAIN_MAX             ' Symbolic names for Gain settings
     #0, FULL, IR, VISIBLE, BOTH                           ' Sensor channel to read
+' TODO: default GA and DF constants
+
+VAR
+
+    word _ir_counts, _fullspec_counts
 
 OBJ
 
@@ -195,6 +200,14 @@ PUB Power(enabled) | tmp
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeRegX (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
+PUB LastIR
+' Returns infra-red data from last measurement
+    return _ir_counts
+
+PUB LastFull
+' Returns full-spectrum data from last measurement
+    return _fullspec_counts
+
 PUB Luminosity(channel) | tmp
 ' Get luminosity data from sensor
 '   Valid values:
@@ -206,15 +219,18 @@ PUB Luminosity(channel) | tmp
     readRegX (core#C0DATAL, 4, @tmp)
     case channel
         %00:
-            return tmp.word[0] & $FFFF
+            result := tmp.word[0] & $FFFF
         %01:
-            return tmp.word[1] & $FFFF
+            result := tmp.word[1] & $FFFF
         %10:
-            return (tmp.word[0] - tmp.word[1]) & $FFFF
+            result := (tmp.word[0] - tmp.word[1]) & $FFFF
         %11:
-            return tmp
+            result := tmp
         OTHER:
             return
+
+    _ir_counts := tmp.word[1] & $FFFF
+    _fullspec_counts := tmp.word[0] & $FFFF
 
 PUB MeasComplete
 ' Indicates ADCs completed integration cycle since AEN bit was set

@@ -5,17 +5,20 @@
     Author: Jesse Burt
     Copyright (c) 2018
     Started Feb 17, 2018
-    Updated Feb 24, 2019
+    Updated Jun 10, 2019
     See end of file for terms of use.
     --------------------------------------------
 }
 
 CON
 
-    _clkmode = cfg#_clkmode
-    _xinfreq = cfg#_xinfreq
+    _clkmode    = cfg#_clkmode
+    _xinfreq    = cfg#_xinfreq
 
-    TSL2591_LUX_DF  = 408
+    LED         = cfg#LED1
+
+    GA          = 1             ' Glass attenuation factor
+    DF          = 53            ' Device factor
 
 OBJ
 
@@ -24,121 +27,87 @@ OBJ
     int   : "string.integer"
     time  : "time"
     lux   : "sensor.lux.tsl2591"
-'    math  : "math.float"
-'    fs    : "string.float"
+    fs    : "string.float"
 
-VAR
-
-    long _ch0, _ch1
-    long _fpscl
-    long _cpl
-    long _ga
-
-PUB Main | it, g, i, r
+PUB Main | atime_ms, againx, lux1, cpl, ch0, ch1, scale
 
     Setup
 
-    lux.Reset
-    lux.Gain (1)               ' 1, 25, 428, 9876
-    lux.IntegrationTime (200)
-    lux.Power (TRUE)
-    lux.Sensor (TRUE)
+    lux.Gain (1)                ' 1, 25, 428, 9876
+    lux.IntegrationTime (100)   ' 100, 200, 300, 400, 500, 600
+
+    scale := 1
+    ATIME_ms := lux.IntegrationTime (-2)
+    AGAINx:= lux.Gain (-2)
+    CPL := ((ATIME_ms * AGAINx) * scale) / (GA * DF)
+
+    ser.Position (0, 3)
+    ser.Str (string("ATIME_ms: "))
+    ser.Dec (ATIME_ms)
     ser.NewLine
-    waitkey
-    ser.Clear
 
-    _ga := 1                      ' Glass attenuation factor
-    _fpscl := 1000                ' Fixed-point math scaler
-    it := lux.IntegrationTime (-2)
-    g := lux.Gain(-2)
-    _cpl := it/g                  ' ADC Counts per Lux
+    ser.Str (string("AGAINx: "))
+    ser.Dec (AGAINx)
+    ser.NewLine
 
-    ser.Position (0, 0)
-    '                0    5    10   15   20   25   30   35   40   45   50
-    '                |    |    |    |    |    |    |    |....|....|....|
-    ser.Str (string("Gain: xxxxx    Integration Time: xxxms    CPL: "))
-    ser.Position (6, 0)
-    ser.Str (int.DecPadded (g, 4))
-    ser.Position (33, 0)
-    ser.Dec (it)
-    ser.Position (47, 0)
-    ser.Dec (_cpl)
+    ser.Str (string("GA: "))
+    ser.Dec (GA)
+    ser.NewLine
+
+    ser.Str (string("DF: "))
+    ser.Dec (DF)
+    ser.NewLine
+
+    ser.Str (string("CPL: "))
+    ser.Dec (CPL)
+    ser.NewLine
 
     repeat
-        repeat until lux.MeasComplete
-'        _ch0 := lux.Luminosity (2)
-'        _ch1 := lux.Luminosity (1)
-{
-        ser.Position (0, 2)
-        ser.Hex (_ch0, 4)
-        ser.Position (0, 3)
-        ser.Hex (_ch1, 4)
-        time.MSleep (100)
-}
+        lux.Luminosity (3)
+        ch0 := lux.LastFull
+        ch1 := lux.LastIR
+        Lux1 := (ch0 - (2 * ch1)) / CPL
 
-        ser.Position (0, 3)
-        ser.Str (int.DecPadded (lux1, 8))
+        ser.Position (0, 9)
+        ser.Str (string("CH0: "))
+        ser.Str (int.DecPadded (ch0, 5))
+        ser.NewLine
 
-{        ser.Str (int.DecPadded (lux2, 8))
-        ser.Position (10, 3)
-        ser.Str (int.DecPadded (lux2/_fpscl, 5))
-        ser.Position (15, 3)
-        ser.Char (".")
-        ser.Dec (lux2//_fpscl)
-        ser.Char (" ")}
-        time.MSleep (100)
+        ser.Str (string("CH1: "))
+        ser.Str (int.DecPadded (ch1, 5))
+        ser.NewLine
 
+        ser.Str (string("(CH0 - (2 * CH1)): "))
+        ser.Str (int.DecPadded (ch0-(2 * ch1), 6))
+        ser.NewLine
 
-PUB lux2 | ATIME_us, AGAINx
-
-    ATIME_us := lux.IntegrationTime (-2) * _fpscl
-    AGAINx := lux.Gain(-2)
-
-    return ((_fpscl * _ch0) - ((2 * _fpscl) * _ch1)) / ((ATIME_us * AGAINx) / (_ga * TSL2591_LUX_DF))
-
-PUB lux1 | f, i, cor
-
-'    f := lux.Luminosity (0) * _fpscl
-'    i := lux.Luminosity (1) * _fpscl
-'    cor := f-i
-    return lux.Luminosity (2)/_cpl
+        ser.Str (string("Lux: "))
+        ser.Str (int.DecPadded (Lux1, 6))
 
 PUB Setup
 
     repeat until ser.Start (115_200)
     ser.Clear
     ser.Str (string("Serial terminal started", ser#NL))
-{
-    if math.Start
-        fs.SetPrecision (3)
-        ser.Str (string("F32 object started", ser#NL))
-    else
-        ser.Str (string("F32 object failed to start", ser#NL))
-        time.MSleep (1)
-        math.Stop
-        lux.Stop
-        ser.Stop
-        repeat
-}
     if lux.Start
-        ser.Str (string("tsl2591 object started"))
+        ser.Str (string("TSL2591 object started"))
+        lux.Reset
+        lux.Power (TRUE)
+        lux.Sensor (TRUE)
+
     else
-        ser.Str (string("tsl2591 object failed to start", ser#NL))
+        ser.Str (string("TSL2591 object failed to start - halting", ser#NL))
         time.MSleep (1)
-        'math.Stop
         lux.Stop
         ser.Stop
-        repeat
+        Flash (LED, 500)
 
-PUB waitkey
+PUB Flash(led_pin, delay_ms)
 
-    ser.Str (string("Press any key", ser#NL))
-    ser.CharIn
-
-PUB waitmsg(msg_string)
-
-    ser.Str (msg_string)
-    ser.CharIn
+    dira[led_pin] := 1
+    repeat
+        !outa[led_pin]
+        time.MSleep (delay_ms)
 
 DAT
 {
