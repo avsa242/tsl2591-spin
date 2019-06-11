@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2018
     Started Feb 17, 2018
-    Updated Jun 10, 2019
+    Updated Jun 11, 2019
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -19,6 +19,9 @@ CON
 
     GA          = 1             ' Glass attenuation factor
     DF          = 53            ' Device factor
+
+    COL         = 26            ' Column to display measurements
+    PADDING     = 6
 
 OBJ
 
@@ -43,22 +46,27 @@ PUB Main | atime_ms, againx, lux1, cpl, ch0, ch1, scale
 
     ser.Position (0, 3)
     ser.Str (string("ATIME_ms: "))
+    ser.Position (COL, 3)
     ser.Dec (ATIME_ms)
     ser.NewLine
 
     ser.Str (string("AGAINx: "))
+    ser.PositionX (COL)
     ser.Dec (AGAINx)
     ser.NewLine
 
     ser.Str (string("GA: "))
+    ser.PositionX (COL)
     ser.Dec (GA)
     ser.NewLine
 
     ser.Str (string("DF: "))
+    ser.PositionX (COL)
     ser.Dec (DF)
     ser.NewLine
 
     ser.Str (string("CPL: "))
+    ser.PositionX (COL)
     ser.Dec (CPL)
     ser.NewLine
 
@@ -70,19 +78,23 @@ PUB Main | atime_ms, againx, lux1, cpl, ch0, ch1, scale
 
         ser.Position (0, 9)
         ser.Str (string("CH0: "))
-        ser.Str (int.DecPadded (ch0, 5))
+        ser.PositionX (COL-PADDING+1)
+        ser.Str (int.DecPadded (ch0, PADDING))
         ser.NewLine
 
         ser.Str (string("CH1: "))
-        ser.Str (int.DecPadded (ch1, 5))
+        ser.PositionX (COL-PADDING+1)
+        ser.Str (int.DecPadded (ch1, PADDING))
         ser.NewLine
 
         ser.Str (string("(CH0 - (2 * CH1)): "))
-        ser.Str (int.DecPadded (ch0-(2 * ch1), 6))
+        ser.PositionX (COL-PADDING+1)
+        ser.Str (int.DecPadded (ch0-(2 * ch1), PADDING))
         ser.NewLine
 
         ser.Str (string("Lux: "))
-        ser.Str (int.DecPadded (Lux1, 6))
+        ser.PositionX (COL-PADDING+1)
+        ser.Str (int.DecPadded (Lux1, PADDING))
 
 PUB Setup
 
