@@ -1,7 +1,7 @@
 # tsl2591-spin 
----------------
+--------------
 
-This is a P8X32A/Propeller driver object for the AMS TSL2591 Lux Sensor.
+This is a P8X32A/Propeller, P2X8C4M64P/Propeller 2 driver object for the AMS TSL2591 Lux Sensor
 
 ## Salient Features
 
@@ -10,16 +10,23 @@ This is a P8X32A/Propeller driver object for the AMS TSL2591 Lux Sensor.
 * Set interrupt thresholds (persistent and non-persistent)
 * Set integration time
 * Set gain multiplier
-* Can sleep after interrupts
+* Optionally sleep after interrupts
+* Force an interrupt
 
 ## Requirements
 
-* 1 extra core/cog for the PASM I2C driver
+* P1/SPIN1: 1 extra core/cog for the PASM I2C driver
+* P2/SPIN2: N/A
+
+## Compiler Compatibility
+
+* P1: OpenSpin (tested with 1.00.81)
+* P2: FastSpin (tested with 4.0.3-beta)
 
 ## Limitations
 
 * Very early in development - may malfunction or outright fail to build
-* Luminosity is currently unverified
+* Luminosity calculation is currently unverified
 
 ## TODO
 
