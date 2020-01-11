@@ -63,7 +63,7 @@ PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): okay
 PUB Stop
 ' Kills I2C cog
     Powered(FALSE)
-    i2c.Stop
+    i2c.Terminate
 
 PUB ClearAllInts
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
