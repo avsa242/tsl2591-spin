@@ -86,7 +86,7 @@ CON
     SF_CLEARALS_NOPERSIST_INT       =     %00111' fields
     SF_CLEAR_NOPERSIST_INT          =     %01010'  - use if TRANS_TYPE_SPECIAL bits above are set
 
-#ifndef __propeller2
+#ifndef __propeller2__
 PUB Null
 '' This is not a top-level object
 #endif
