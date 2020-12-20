@@ -267,13 +267,13 @@ PUB PersistIntThresh(low, high): curr_thr
     case low
         0..65535:
         other:
-            curr_thr.word[0] := curr_thr.word[0]
+            return curr_thr.word[0]
 
     case high
         0..65535:
             high := (high << 16) | low
         other:
-            curr_thr.word[1] := curr_thr.word[1]
+            return curr_thr.word[1]
 
     case curr_thr
         0:
