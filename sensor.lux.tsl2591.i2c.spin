@@ -19,7 +19,7 @@ CON
     DEF_SDA         = 29
     DEF_HZ          = 100_000
 
-    LSB             = 0
+    FPSCALE         = 1_000                     ' fixed-point math scale
 
 ' Gain settings
     GAIN_LOW        = 0
@@ -35,7 +35,9 @@ CON
 
 VAR
 
-    word _ir_counts, _fullspec_counts
+    long _cpl, _itime, _gain, _glass_att, _dev_fact
+    long _ir_adc_scl, _full_adc_scl
+    word _ir_adc, _full_adc
 
 OBJ
 
@@ -46,19 +48,19 @@ PUB Null{}
 ' This is not a top-level object
 
 PUB Start{}: okay
-
+' Start using "standard" Propeller I2C pins and 100kHz
     okay := startx(DEF_SCL, DEF_SDA, DEF_HZ)
     return
 
 PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): okay
-
+' Start using custom settings
     if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31)
         if I2C_HZ =< core#I2C_MAX_FREQ
             if okay := i2c.setupx(SCL_PIN, SDA_PIN, I2C_HZ)
                 if deviceid{} == core#DEV_ID_RESP
                     reset{}
                     return okay
-    return FALSE
+    return FALSE                                ' something above failed
 
 PUB Stop{}
 ' Kills I2C cog
@@ -69,11 +71,13 @@ PUB Defaults{}
 ' Factory default settings
     reset{}
 
-PUB DefaultsALS{}
+PUB Defaults_ALS{}
 ' Factory defaults, with sensor enabled
     reset{}
     powered(TRUE)
     sensorenabled(TRUE)
+    devicefactor(408)
+    glassattenuation(1)
     gain(1)
     integrationtime(100)
 
@@ -96,6 +100,10 @@ PUB DataReady{}: flag
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AVALID) & 1) == 1
 
+PUB DeviceFactor(df)
+' Set device factor
+    _dev_fact := df
+
 PUB DeviceID{}: id
 ' Device ID of chip
 '   Known values: $50
@@ -117,6 +125,7 @@ PUB Gain(gainx): curr_gain
     readreg(core#CONTROL, 1, @curr_gain)
     case gainx
         1, 25, 428, 9876:
+            _gain := gainx
             gainx := lookdownz(gainx: 1, 25, 428, 9876) << core#AGAIN
         other:
             curr_gain := (curr_gain >> core#AGAIN) & core#AGAIN_BITS
@@ -124,6 +133,11 @@ PUB Gain(gainx): curr_gain
 
     gainx := ((curr_gain & core#AGAIN_MASK) | gainx) & core#CONTROL_MASK
     writereg(core#CONTROL, 1, gainx)
+    updatecpl{}                                 ' update counts per lux equ.
+
+PUB GlassAttenuation(ga)
+' Set glass attenuation factor
+    _glass_att := ga
 
 PUB IntegrationTime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
@@ -133,6 +147,7 @@ PUB IntegrationTime(time_ms): curr_time
     readreg(core#CONTROL, 1, @curr_time)
     case time_ms
         100, 200, 300, 400, 500, 600:
+            _itime := time_ms
             time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
         other:
             curr_time &= core#ATIME_BITS
@@ -140,6 +155,7 @@ PUB IntegrationTime(time_ms): curr_time
 
     time_ms := ((curr_time & core#ATIME_MASK) | time_ms) & core#CONTROL_MASK
     writereg(core#CONTROL, 1, time_ms)
+    updatecpl{}                                 ' update counts per lux equ.
 
 PUB Interrupt{}: flag
 ' Flag indicating a non-persistent interrupt has been triggered
@@ -195,11 +211,20 @@ PUB IntThresh(low, high): curr_thr
 
 PUB LastFull{}: fsdata
 ' Returns full-spectrum data from last measurement
-    return _fullspec_counts
+    return _full_adc
 
 PUB LastIR{}: irdata
 ' Returns infra-red data from last measurement
-    return _ir_counts
+    return _ir_adc
+
+PUB LastLux{}: l
+' Return Lux from last measurement (scale = 1000x)
+    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+
+PUB Lux{}: l
+' Return Lux from live measurement (scale = 1000x)
+    measure(BOTH)
+    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
 PUB Measure(channel): lum_data
 ' Get luminosity data from sensor
@@ -223,8 +248,10 @@ PUB Measure(channel): lum_data
         other:
             return
 
-    _ir_counts := lum_data.word[1] & $FFFF
-    _fullspec_counts := lum_data.word[0] & $FFFF
+    _ir_adc := lum_data.word[1] & $FFFF
+    _full_adc := lum_data.word[0] & $FFFF
+    _ir_adc_scl := _ir_adc * FPSCALE
+    _full_adc_scl := _full_adc * FPSCALE
 
 PUB PackageID{}: id
 ' Returns Package ID
@@ -356,6 +383,10 @@ PUB SleepAfterInt(state): curr_state
 
     state := ((curr_state & core#SAI_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
+
+PRI updateCPL{}
+' Update counts-per-lux, used in Lux calculations
+    _cpl := ((_itime * _gain) * FPSCALE) / (_glass_att * _dev_fact)
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_packet[2], tmp
 ' Read nr_bytes from device into ptr_buff
