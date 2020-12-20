@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2020
     Started Nov 23, 2019
-    Updated Jan 10, 2020
+    Updated Dec 20, 2020
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -67,21 +67,21 @@ PUB Stop
 
 PUB ClearAllInts
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-    writeReg (core#TRANS_SPECIAL, core#SF_CLEARALS_NOPERSIST_INT, 0, 0)
+    writeReg (core#TRANS_SPECIAL, core#SF_CLRALS_NP_INT, 0, 0)
 
 PUB ClearInt
 ' Clears NPALS Interrupt
-    writeReg ( core#TRANS_SPECIAL, core#SF_CLEAR_NOPERSIST_INT, 0, 0)
+    writeReg ( core#TRANS_SPECIAL, core#SF_CLR_NP_INT, 0, 0)
 
 PUB ClearPersistInt
 ' Clears ALS Interrupt
-    writeReg ( core#TRANS_SPECIAL, core#SF_CLEARALSINT, 0, 0)
+    writeReg ( core#TRANS_SPECIAL, core#SF_CLRALSINT, 0, 0)
 
 PUB DataReady
 ' Indicates ADCs completed integration cycle since AEN bit was set
     result := $00
     readReg (core#STATUS, 1, @result)
-    return ((result >> core#FLD_AVALID) & %1) * TRUE
+    return ((result >> core#AVALID) & %1) * TRUE
 
 PUB DeviceID
 ' Device ID of chip
@@ -105,12 +105,12 @@ PUB Gain(multiplier) | tmp
     readReg (core#CONTROL, 1, @tmp)
     case multiplier
         1, 25, 428, 9876:
-            multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#FLD_AGAIN
+            multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#AGAIN
         OTHER:
-            result := (tmp >> core#FLD_AGAIN) & core#BITS_AGAIN
+            result := (tmp >> core#AGAIN) & core#AGAIN_BITS
             return lookupz(result: 1, 25, 428, 9876)
 
-    tmp &= core#MASK_AGAIN
+    tmp &= core#AGAIN_MASK
     tmp := (tmp | multiplier) & core#CONTROL_MASK
     writeReg (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
@@ -124,10 +124,10 @@ PUB IntegrationTime(time_ms) | tmp
         100, 200, 300, 400, 500, 600:
             time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
         OTHER:
-            result := tmp & core#BITS_ATIME
+            result := tmp & core#ATIME_BITS
             return lookupz(result: 100, 200, 300, 400, 500, 600)
 
-    tmp &= core#MASK_ATIME
+    tmp &= core#ATIME_MASK
     tmp := (tmp | time_ms) & core#CONTROL_MASK
     writeReg (core#TRANS_NORMAL, core#CONTROL, 1, tmp)
 
@@ -136,7 +136,7 @@ PUB Interrupt
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
     result := $00
     readReg (core#STATUS, 1, @result)
-    result := ((result >> core#FLD_NPINTR) & %1) * TRUE
+    result := ((result >> core#NPINTR) & %1) * TRUE
 
 PUB IntsEnabled(enabled) | tmp
 ' Enable non-persistent interrupts
@@ -146,11 +146,11 @@ PUB IntsEnabled(enabled) | tmp
     readReg (core#ENABLE, 1, @tmp)
     case ||enabled
         0, 1:
-            enabled := ||enabled << core#FLD_NPIEN
+            enabled := ||enabled << core#NPIEN
         OTHER:
-            return ((tmp >> core#FLD_NPIEN) & %1) * TRUE
+            return ((tmp >> core#NPIEN) & %1) * TRUE
 
-    tmp &= core#MASK_NPIEN
+    tmp &= core#NPIEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeReg ( core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
@@ -223,7 +223,7 @@ PUB PersistInt
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
     result := $00
     readReg (core#STATUS, 1, @result)
-    result := ((result >> core#FLD_AINT) & %1) * TRUE
+    result := ((result >> core#AINT) & %1) * TRUE
 
 PUB PersistIntCycles(cycles) | tmp
 ' Set number of consecutive cycles necessary to generate an interrupt (i.e., persistence)
@@ -236,7 +236,7 @@ PUB PersistIntCycles(cycles) | tmp
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
             cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
         OTHER:
-            tmp &= core#BITS_APERS
+            tmp &= core#APERS_BITS
             result := lookupz(tmp: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
             return
 
@@ -253,11 +253,11 @@ PUB PersistIntsEnabled(enabled) | tmp
     readReg (core#ENABLE, 1, @tmp)
     case ||enabled
         0, 1:
-            enabled := ||enabled << core#FLD_AIEN
+            enabled := ||enabled << core#AIEN
         OTHER:
-            return ((tmp >> core#FLD_AIEN) & %1) * TRUE
+            return ((tmp >> core#AIEN) & %1) * TRUE
 
-    tmp &= core#MASK_AIEN
+    tmp &= core#AIEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeReg (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
@@ -302,13 +302,13 @@ PUB Powered(enabled) | tmp
         OTHER:
             return (tmp & %1) * TRUE
 
-    tmp &= core#MASK_PON
+    tmp &= core#PON_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeReg (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
 PUB Reset
 ' Resets the TSL2591 (equivalent to POR)
-    writeReg (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#FLD_SRESET)
+    writeReg (core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#SRESET)
 
 PUB SensorEnabled(enabled) | tmp
 ' Enable ambient light sensor ADCs
@@ -320,11 +320,11 @@ PUB SensorEnabled(enabled) | tmp
     readReg (core#ENABLE, 1, @tmp)
     case ||enabled
         0, 1:
-            enabled := ||enabled << core#FLD_AEN
+            enabled := ||enabled << core#AEN
         OTHER:
-            return ((tmp >> core#FLD_AEN) & %1) * TRUE
+            return ((tmp >> core#AEN) & %1) * TRUE
 
-    tmp &= core#MASK_AEN
+    tmp &= core#AEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeReg (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
@@ -338,11 +338,11 @@ PUB SleepAfterInt(enabled) | tmp
     readReg (core#ENABLE, 1, @tmp)
     case ||enabled
         0, 1:
-            enabled := ||enabled << core#FLD_SAI
+            enabled := ||enabled << core#SAI
         OTHER:
-            return ((tmp >> core#FLD_SAI) & %1) * TRUE
+            return ((tmp >> core#SAI) & %1) * TRUE
 
-    tmp &= core#MASK_SAI
+    tmp &= core#SAI_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
     writeReg (core#TRANS_NORMAL, core#ENABLE, 1, tmp)
 
@@ -370,7 +370,7 @@ PRI writeReg(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
 
         core#TRANS_SPECIAL:
             case reg
-                core#SF_FORCEINT, core#SF_CLEARALSINT, core#SF_CLEARALS_NOPERSIST_INT, core#SF_CLEAR_NOPERSIST_INT:
+                core#SF_FORCEINT, core#SF_CLRALSINT, core#SF_CLRALS_NP_INT, core#SF_CLR_NP_INT:
                     nr_bytes := 0
                     val := 0
                 OTHER:
