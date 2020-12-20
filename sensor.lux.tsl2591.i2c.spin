@@ -317,9 +317,8 @@ PUB SensorEnabled(state): curr_state
         other:
             return ((curr_state >> core#AEN) & 1) == 1
 
-    curr_state &= core#AEN_MASK
-    curr_state := (curr_state | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
+    state := ((curr_state & core#AEN_MASK) | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
 
 PUB SleepAfterInt(state): curr_state
 ' Enable Sleep After Interrupt
