@@ -252,9 +252,8 @@ PUB PersistIntsEnabled(state): curr_state
         other:
             return ((curr_state >> core#AIEN) & 1) == 1
 
-    curr_state &= core#AIEN_MASK
-    curr_state := (curr_state | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
+    state := ((curr_state & core#AIEN_MASK) | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
 
 PUB PersistIntThresh(low, high): curr_thr
 ' Sets trigger threshold values for persistent ALS interrupts
