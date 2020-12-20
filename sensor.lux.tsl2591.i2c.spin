@@ -65,6 +65,16 @@ PUB Stop{}
     powered(FALSE)
     i2c.terminate{}
 
+PUB Defaults{}
+' Factory default settings
+    reset{}
+
+PUB DefaultsALS{}
+' Factory defaults, with sensor enabled
+    reset{}
+    powered(TRUE)
+    sensorenabled(TRUE)
+
 PUB ClearAllInts{}
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
     writereg(core#TRANS_SPECIAL, core#SF_CLRALS_NP_INT, 0, 0)
