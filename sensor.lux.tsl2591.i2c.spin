@@ -296,9 +296,8 @@ PUB Powered(state): curr_state
         other:
             return (curr_state & 1) == 1
 
-    curr_state &= core#PON_MASK
-    curr_state := (curr_state | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
+    state := ((curr_state & core#PON_MASK) | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
 
 PUB Reset{}
 ' Resets the TSL2591 (equivalent to POR)
