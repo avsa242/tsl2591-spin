@@ -81,7 +81,7 @@ PUB DataReady{}
 ' Indicates ADCs completed integration cycle since AEN bit was set
     result := $00
     readreg(core#STATUS, 1, @result)
-    return ((result >> core#AVALID) & 1) * TRUE
+    return ((result >> core#AVALID) & 1) == 1
 
 PUB DeviceID{}
 ' Device ID of chip
@@ -136,7 +136,7 @@ PUB Interrupt{}
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
     result := $00
     readreg(core#STATUS, 1, @result)
-    result := ((result >> core#NPINTR) & 1) * TRUE
+    result := ((result >> core#NPINTR) & 1) == 1
 
 PUB IntsEnabled(enabled) | tmp
 ' Enable non-persistent interrupts
@@ -148,7 +148,7 @@ PUB IntsEnabled(enabled) | tmp
         0, 1:
             enabled := ||(enabled) << core#NPIEN
         other:
-            return ((tmp >> core#NPIEN) & 1) * TRUE
+            return ((tmp >> core#NPIEN) & 1) == 1
 
     tmp &= core#NPIEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
@@ -223,7 +223,7 @@ PUB PersistInt{}
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
     result := $00
     readreg(core#STATUS, 1, @result)
-    result := ((result >> core#AINT) & 1) * TRUE
+    result := ((result >> core#AINT) & 1) == 1
 
 PUB PersistIntCycles(cycles) | tmp
 ' Set number of consecutive cycles necessary to generate an interrupt (i.e., persistence)
@@ -255,7 +255,7 @@ PUB PersistIntsEnabled(enabled) | tmp
         0, 1:
             enabled := ||(enabled) << core#AIEN
         other:
-            return ((tmp >> core#AIEN) & 1) * TRUE
+            return ((tmp >> core#AIEN) & 1) == 1
 
     tmp &= core#AIEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
@@ -300,7 +300,7 @@ PUB Powered(enabled) | tmp
         0, 1:
             enabled := ||(enabled)
         other:
-            return (tmp & 1) * TRUE
+            return (tmp & 1) == 1
 
     tmp &= core#PON_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
@@ -322,7 +322,7 @@ PUB SensorEnabled(enabled) | tmp
         0, 1:
             enabled := ||(enabled) << core#AEN
         other:
-            return ((tmp >> core#AEN) & 1) * TRUE
+            return ((tmp >> core#AEN) & 1) == 1
 
     tmp &= core#AEN_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
@@ -340,7 +340,7 @@ PUB SleepAfterInt(enabled) | tmp
         0, 1:
             enabled := ||(enabled) << core#SAI
         other:
-            return ((tmp >> core#SAI) & 1) * TRUE
+            return ((tmp >> core#SAI) & 1) == 1
 
     tmp &= core#SAI_MASK
     tmp := (tmp | enabled) & core#ENABLE_MASK
