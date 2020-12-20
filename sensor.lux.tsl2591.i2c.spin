@@ -122,12 +122,11 @@ PUB IntegrationTime(time_ms): curr_time
         100, 200, 300, 400, 500, 600:
             time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
         other:
-            result := curr_time & core#ATIME_BITS
-            return lookupz(result: 100, 200, 300, 400, 500, 600)
+            curr_time &= core#ATIME_BITS
+            return lookupz(curr_time: 100, 200, 300, 400, 500, 600)
 
-    curr_time &= core#ATIME_MASK
-    curr_time := (curr_time | time_ms) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, curr_time)
+    time_ms := ((curr_time & core#ATIME_MASK) | time_ms) & core#CONTROL_MASK
+    writereg(core#TRANS_NORMAL, core#CONTROL, 1, time_ms)
 
 PUB Interrupt{}: flag
 ' Flag indicating a non-persistent interrupt has been triggered
