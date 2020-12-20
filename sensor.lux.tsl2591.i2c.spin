@@ -334,9 +334,8 @@ PUB SleepAfterInt(state): curr_state
         other:
             return ((curr_state >> core#SAI) & 1) == 1
 
-    curr_state &= core#SAI_MASK
-    curr_state := (curr_state | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
+    state := ((curr_state & core#SAI_MASK) | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
 
 PRI readReg(reg, nr_bytes, buff_addr) | cmd_packet[2], tmp
 'Read nr_bytes from register 'reg' to address 'addr_buff'
