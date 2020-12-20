@@ -388,20 +388,29 @@ PRI updateCPL{}
 ' Update counts-per-lux, used in Lux calculations
     _cpl := ((_itime * _gain) * FPSCALE) / (_glass_att * _dev_fact)
 
-PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_packet[2], tmp
+PUB readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
 ' Read nr_bytes from device into ptr_buff
-    writereg(reg_nr, 0, 0)
+    case reg_nr
+        core#ENABLE, core#CONTROL, core#AILTL..core#PERSIST,{
+}       core#PID..core#C1DATAH:
+            cmd_pkt.byte[0] := SLAVE_WR
+            cmd_pkt.byte[1] := reg_nr | core#CMD_NORMAL
 
-    i2c.start{}
-    i2c.write(SLAVE_RD)
-    repeat tmp from 0 to nr_bytes-1
-        byte[ptr_buff][tmp] := i2c.read(tmp == nr_bytes-1)
-    i2c.stop{}
+            i2c.start()
+            repeat tmp from 0 to 1
+                i2c.write(cmd_pkt.byte[tmp])
 
-PRI writeReg(reg_nr, nr_bytes, val) | cmd_packet[2], tmp
+            i2c.wait(SLAVE_RD)
+            repeat tmp from 0 to nr_bytes-1
+                byte[ptr_buff][tmp] := i2c.read(tmp == nr_bytes-1)
+            i2c.stop()
+        other:
+            return
+
+PRI writeReg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
 ' Write nr_bytes from val to device
     case reg_nr
-        core#ENABLE, core#CONTROL, core#AILTL..core#NPAIHTH, core#PERSIST, core#PID..core#C1DATAH:
+        core#ENABLE, core#CONTROL, core#AILTL..core#PERSIST:
             reg_nr |= core#CMD_NORMAL
         core#SF_FORCEINT, core#SF_CLRALSINT, core#SF_CLRALS_NP_INT,{
 }       core#SF_CLR_NP_INT:
@@ -410,19 +419,19 @@ PRI writeReg(reg_nr, nr_bytes, val) | cmd_packet[2], tmp
         other:
             return
 
-    cmd_packet.byte[0] := SLAVE_WR
-    cmd_packet.byte[1] := reg_nr
+    cmd_pkt.byte[0] := SLAVE_WR
+    cmd_pkt.byte[1] := reg_nr
 
     case nr_bytes
         0:
         1..4:
             repeat tmp from 0 to nr_bytes-1
-                cmd_packet.byte[2 + tmp] := val.byte[tmp]
+                cmd_pkt.byte[2 + tmp] := val.byte[tmp]
         other:
             return
 
     i2c.start{}
-    i2c.wr_block(@cmd_packet, nr_bytes+2)
+    i2c.wr_block(@cmd_pkt, nr_bytes+2)
     i2c.stop{}
 
 DAT

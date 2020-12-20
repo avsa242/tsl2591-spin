@@ -47,9 +47,8 @@ PUB Main{}
         repeat until tsl2591.dataready{}
         tsl2591.measure(tsl2591#BOTH)
 
-        ser.position(0, 5)
+        ser.position(0, 3)
         ser.str(string("Lux: "))
-        ser.positionx(DAT_COL)
         decimaldot(tsl2591.lastlux{}, 1000)
 
 PRI DecimalDot(scaled, divisor) | whole[4], part[4], places, tmp

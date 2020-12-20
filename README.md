@@ -9,9 +9,11 @@ This is a P8X32A/Propeller, P2X8C4M64P/Propeller 2 driver object for the AMS TSL
 
 * I2C connection up to 400kHz
 * Read all sensor channels together, or individually
+* Read calculated lux (unverified)
 * Set interrupt thresholds (persistent and non-persistent)
 * Set integration time
 * Set gain multiplier
+* Set device factor, glass attenuation
 * Optionally sleep after interrupts
 * Force an interrupt
 
@@ -27,7 +29,7 @@ P2/SPIN2:
 ## Compiler Compatibility
 
 * P1/SPIN1: OpenSpin (tested with 1.00.81)
-* P2/SPIN2: FastSpin (tested with 4.1.10-beta)
+* P2/SPIN2: FlexSpin (tested with 5.0.0)
 * ~~BST~~ (incompatible - no preprocessor)
 * ~~Propeller Tool~~ (incompatible - no preprocessor)
 * ~~PNut~~ (incompatible - no preprocessor)
