@@ -112,7 +112,7 @@ PUB ForceInt()
 '   PersistIntsEnabled() must be set to TRUE
     writereg(core.SF_FORCEINT, 0, 0)
 
-PUB Gain(gainx): curr_gain
+PUB Gain(gainx=-2): curr_gain
 ' Set gain gainx/factor
 '   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
@@ -134,7 +134,7 @@ PUB GlassAttenuation(ga)
 ' Set glass attenuation factor
     _glass_att := ga
 
-PUB IntegrationTime(time_ms): curr_time
+PUB IntegrationTime(time_ms=-2): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
@@ -162,7 +162,7 @@ PUB Interrupt(): flag
     readreg(core.STATUS, 1, @flag)
     return ((flag >> core.NPINTR) & 1) == 1
 
-PUB IntsEnabled(state): curr_state
+PUB IntsEnabled(state=-2): curr_state
 ' Enable non-persistent interrupts
 '   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
@@ -264,7 +264,7 @@ PUB PersistInt(): flag
     readreg(core.STATUS, 1, @flag)
     return ((flag >> core.AINT) & 1) == 1
 
-PUB PersistIntCycles(cycles): curr_cyc
+PUB PersistIntCycles(cycles=-2): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
@@ -284,7 +284,7 @@ PUB PersistIntCycles(cycles): curr_cyc
             return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
 }           40, 45, 50, 55, 60)
 
-PUB PersistIntsEnabled(state): curr_state
+PUB PersistIntsEnabled(state=-2): curr_state
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -327,7 +327,7 @@ PUB PersistIntThresh(low, high): curr_thr
 
     writereg(core.AILTL, 4, high)
 
-PUB Powered(state): curr_state
+PUB Powered(state=-2): curr_state
 ' Enable sensor power
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -347,7 +347,7 @@ PUB Reset()
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core.CONTROL, 1, 1 << core.SRESET)
 
-PUB SensorEnabled(state): curr_state
+PUB SensorEnabled(state=-2): curr_state
 ' Enable ambient light sensor ADCs
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -363,7 +363,7 @@ PUB SensorEnabled(state): curr_state
     state := ((curr_state & core.AEN_MASK) | state) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, state)
 
-PUB SleepAfterInt(state): curr_state
+PUB SleepAfterInt(state=-2): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
