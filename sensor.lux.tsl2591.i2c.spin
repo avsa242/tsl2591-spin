@@ -160,18 +160,18 @@ PUB IntThresh(low, high): curr_thr
     case low
         0..65535:
         other:
-            result.word[0] := curr_thr.word[0]
+            return curr_thr.word[0]
 
     case high
         0..65535:
             high := (high << 16) | low
         other:
-            result.word[1] := curr_thr.word[1]
+            return curr_thr.word[1]
 
-    case result
+    case curr_thr
         0:
         other:
-            return result
+            return curr_thr
 
     writereg(core#TRANS_NORMAL, core#NPAILTL, 4, high)
 
