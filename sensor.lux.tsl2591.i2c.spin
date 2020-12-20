@@ -96,22 +96,21 @@ PUB ForceInt{}
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
     writereg(core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
-PUB Gain(multiplier): curr_gain
-' Set gain multiplier/factor
+PUB Gain(gainx): curr_gain
+' Set gain gainx/factor
 '   Valid values: 1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
     curr_gain := 0
     readreg(core#CONTROL, 1, @curr_gain)
-    case multiplier
+    case gainx
         1, 25, 428, 9876:
-            multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#AGAIN
+            gainx := lookdownz(gainx: 1, 25, 428, 9876) << core#AGAIN
         other:
             curr_gain := (curr_gain >> core#AGAIN) & core#AGAIN_BITS
             return lookupz(curr_gain: 1, 25, 428, 9876)
 
-    curr_gain &= core#AGAIN_MASK
-    curr_gain := (curr_gain | multiplier) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, curr_gain)
+    gainx := ((curr_gain & core#AGAIN_MASK) | gainx) & core#CONTROL_MASK
+    writereg(core#TRANS_NORMAL, core#CONTROL, 1, gainx)
 
 PUB IntegrationTime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
@@ -259,7 +258,7 @@ PUB PersistIntsEnabled(state): curr_state
     curr_state := (curr_state | state) & core#ENABLE_MASK
     writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
-PUB PersistIntThresh(low, high): curr_thr | curr_thr
+PUB PersistIntThresh(low, high): curr_thr
 ' Sets trigger threshold values for persistent ALS interrupts
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
