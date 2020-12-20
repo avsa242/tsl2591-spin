@@ -137,7 +137,7 @@ PUB Interrupt{}: flag
 
 PUB IntsEnabled(state): curr_state
 ' Enable non-persistent interrupts
-'   Valid values: TRUE (1 or -1): interrupts state, FALSE (0) disables interrupts
+'   Valid values: TRUE (1 or -1), FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
@@ -147,9 +147,8 @@ PUB IntsEnabled(state): curr_state
         other:
             return ((curr_state >> core#NPIEN) & 1) == 1
 
-    curr_state &= core#NPIEN_MASK
-    curr_state := (curr_state | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
+    state := ((curr_state & core#NPIEN_MASK) | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
 
 PUB IntThresh(low, high): curr_thr
 ' Set non-persistent interrupt thresholds
