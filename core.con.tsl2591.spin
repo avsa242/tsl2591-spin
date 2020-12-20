@@ -76,16 +76,14 @@ CON
     C1DATAL         = $16
     C1DATAH         = $17
 
-    TSL2591_CMD     = %1000_0000
-
-    TRANS_NORMAL    = %0010_0000
-    TRANS_SPECIAL   = %0110_0000
+    CMD_NORMAL      = %1_01_00000
+    CMD_SPECIAL     = %1_11_00000
 
 ' Special functions (used with TRANS_SPECIAL)
-    SF_FORCEINT     = %00100
-    SF_CLRALSINT    = %00110
-    SF_CLRALS_NP_INT= %00111
-    SF_CLR_NP_INT   = %01010
+    SF_FORCEINT     = CMD_SPECIAL | %00100
+    SF_CLRALSINT    = CMD_SPECIAL | %00110
+    SF_CLRALS_NP_INT= CMD_SPECIAL | %00111
+    SF_CLR_NP_INT   = CMD_SPECIAL | %01010
 
 #ifndef __propeller2__
 PUB Null

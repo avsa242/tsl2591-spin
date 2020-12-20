@@ -74,18 +74,20 @@ PUB DefaultsALS{}
     reset{}
     powered(TRUE)
     sensorenabled(TRUE)
+    gain(1)
+    integrationtime(100)
 
 PUB ClearAllInts{}
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-    writereg(core#TRANS_SPECIAL, core#SF_CLRALS_NP_INT, 0, 0)
+    writereg(core#SF_CLRALS_NP_INT, 0, 0)
 
 PUB ClearInt{}
 ' Clears NPALS Interrupt
-    writereg(core#TRANS_SPECIAL, core#SF_CLR_NP_INT, 0, 0)
+    writereg(core#SF_CLR_NP_INT, 0, 0)
 
 PUB ClearPersistInt{}
 ' Clears ALS Interrupt
-    writereg(core#TRANS_SPECIAL, core#SF_CLRALSINT, 0, 0)
+    writereg(core#SF_CLRALSINT, 0, 0)
 
 PUB DataReady{}: flag
 ' Flag indicating new luminosity data is ready
@@ -105,7 +107,7 @@ PUB ForceInt{}
 ' NOTE: An active interrupt will always be visible using Interrupt(),
 '   however, to be visible on the INT pin, IntsEnabled() or
 '   PersistIntsEnabled() must be set to TRUE
-    writereg(core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
+    writereg(core#SF_FORCEINT, 0, 0)
 
 PUB Gain(gainx): curr_gain
 ' Set gain gainx/factor
@@ -121,7 +123,7 @@ PUB Gain(gainx): curr_gain
             return lookupz(curr_gain: 1, 25, 428, 9876)
 
     gainx := ((curr_gain & core#AGAIN_MASK) | gainx) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, gainx)
+    writereg(core#CONTROL, 1, gainx)
 
 PUB IntegrationTime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
@@ -137,7 +139,7 @@ PUB IntegrationTime(time_ms): curr_time
             return lookupz(curr_time: 100, 200, 300, 400, 500, 600)
 
     time_ms := ((curr_time & core#ATIME_MASK) | time_ms) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, time_ms)
+    writereg(core#CONTROL, 1, time_ms)
 
 PUB Interrupt{}: flag
 ' Flag indicating a non-persistent interrupt has been triggered
@@ -162,7 +164,7 @@ PUB IntsEnabled(state): curr_state
             return ((curr_state >> core#NPIEN) & 1) == 1
 
     state := ((curr_state & core#NPIEN_MASK) | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
+    writereg(core#ENABLE, 1, state)
 
 PUB IntThresh(low, high): curr_thr
 ' Set non-persistent interrupt thresholds
@@ -189,7 +191,7 @@ PUB IntThresh(low, high): curr_thr
         other:
             return curr_thr
 
-    writereg(core#TRANS_NORMAL, core#NPAILTL, 4, high)
+    writereg(core#NPAILTL, 4, high)
 
 PUB LastFull{}: fsdata
 ' Returns full-spectrum data from last measurement
@@ -250,7 +252,7 @@ PUB PersistIntCycles(cycles): curr_cyc
 '   Any other value polls the chip and returns the current setting
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
-            writereg(core#TRANS_NORMAL, core#PERSIST, 1, curr_cyc)
+            writereg(core#PERSIST, 1, curr_cyc)
             cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
 }           40, 45, 50, 55, 60)
         other:
@@ -274,7 +276,7 @@ PUB PersistIntsEnabled(state): curr_state
             return ((curr_state >> core#AIEN) & 1) == 1
 
     state := ((curr_state & core#AIEN_MASK) | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
+    writereg(core#ENABLE, 1, state)
 
 PUB PersistIntThresh(low, high): curr_thr
 ' Sets trigger threshold values for persistent ALS interrupts
@@ -301,7 +303,7 @@ PUB PersistIntThresh(low, high): curr_thr
         other:
             return curr_thr
 
-    writereg(core#TRANS_NORMAL, core#AILTL, 4, high)
+    writereg(core#AILTL, 4, high)
 
 PUB Powered(state): curr_state
 ' Enable sensor power
@@ -317,11 +319,11 @@ PUB Powered(state): curr_state
             return (curr_state & 1) == 1
 
     state := ((curr_state & core#PON_MASK) | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
+    writereg(core#ENABLE, 1, state)
 
 PUB Reset{}
 ' Resets the TSL2591 (equivalent to POR)
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#SRESET)
+    writereg(core#CONTROL, 1, 1 << core#SRESET)
 
 PUB SensorEnabled(state): curr_state
 ' Enable ambient light sensor ADCs
@@ -337,7 +339,7 @@ PUB SensorEnabled(state): curr_state
             return ((curr_state >> core#AEN) & 1) == 1
 
     state := ((curr_state & core#AEN_MASK) | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
+    writereg(core#ENABLE, 1, state)
 
 PUB SleepAfterInt(state): curr_state
 ' Enable Sleep After Interrupt
@@ -353,42 +355,32 @@ PUB SleepAfterInt(state): curr_state
             return ((curr_state >> core#SAI) & 1) == 1
 
     state := ((curr_state & core#SAI_MASK) | state) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, state)
+    writereg(core#ENABLE, 1, state)
 
-PRI readReg(reg, nr_bytes, buff_addr) | cmd_packet[2], tmp
-'Read nr_bytes from register 'reg' to address 'addr_buff'
-    writereg(core#TRANS_NORMAL, reg, 0, 0)
+PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_packet[2], tmp
+' Read nr_bytes from device into ptr_buff
+    writereg(reg_nr, 0, 0)
 
     i2c.start{}
     i2c.write(SLAVE_RD)
     repeat tmp from 0 to nr_bytes-1
-        byte[buff_addr][tmp] := i2c.read(tmp == nr_bytes-1)
+        byte[ptr_buff][tmp] := i2c.read(tmp == nr_bytes-1)
     i2c.stop{}
 
-PRI writeReg(trans_type, reg, nr_bytes, val) | cmd_packet[2], tmp
-' Write nr_bytes to register 'reg' stored in val
-    cmd_packet.byte[LSB] := SLAVE_WR
-
-    case trans_type
-        core#TRANS_NORMAL:
-            case reg
-                core#ENABLE, core#CONTROL, core#AILTL..core#NPAIHTH, core#PERSIST, core#PID..core#C1DATAH:
-                other:
-                    return
-'            cmd_packet.byte[1] := (core#TSL2591_CMD | trans_type) | reg
-
-        core#TRANS_SPECIAL:
-            case reg
-                core#SF_FORCEINT, core#SF_CLRALSINT, core#SF_CLRALS_NP_INT, core#SF_CLR_NP_INT:
-                    nr_bytes := 0
-                    val := 0
-                other:
-                    return
-
+PRI writeReg(reg_nr, nr_bytes, val) | cmd_packet[2], tmp
+' Write nr_bytes from val to device
+    case reg_nr
+        core#ENABLE, core#CONTROL, core#AILTL..core#NPAIHTH, core#PERSIST, core#PID..core#C1DATAH:
+            reg_nr |= core#CMD_NORMAL
+        core#SF_FORCEINT, core#SF_CLRALSINT, core#SF_CLRALS_NP_INT,{
+}       core#SF_CLR_NP_INT:
+            nr_bytes := 0
+            val := 0
         other:
             return
 
-    cmd_packet.byte[1] := (core#TSL2591_CMD | trans_type) | reg
+    cmd_packet.byte[0] := SLAVE_WR
+    cmd_packet.byte[1] := reg_nr
 
     case nr_bytes
         0:
