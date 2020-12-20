@@ -215,7 +215,7 @@ PUB PackageID{}: id
     readreg(core#PID, 1, @id)
 
 PUB PersistInt{}: flag
-' Indicates if a persistent interrupt has been triggered
+' Flag indicating a persistent interrupt has been triggered
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
     flag := 0
     readreg(core#STATUS, 1, @flag)
@@ -226,17 +226,17 @@ PUB PersistIntCycles(cycles): curr_cyc
 '   Valid values:
 '       0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
 '   Any other value polls the chip and returns the current setting
-    curr_cyc := 0
-    readreg(core#PERSIST, 1, @curr_cyc)
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
-            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+            writereg(core#TRANS_NORMAL, core#PERSIST, 1, curr_cyc)
+            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
+}           40, 45, 50, 55, 60)
         other:
+            curr_cyc := 0
+            readreg(core#PERSIST, 1, @curr_cyc)
             curr_cyc &= core#APERS_BITS
-            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
-
-    curr_cyc := cycles & core#PERSIST_MASK
-    writereg(core#TRANS_NORMAL, core#PERSIST, 1, curr_cyc)
+            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
+}           40, 45, 50, 55, 60)
 
 PUB PersistIntsEnabled(state): curr_state
 ' Enable persistent interrupts
