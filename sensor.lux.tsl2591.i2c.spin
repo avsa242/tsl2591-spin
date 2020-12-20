@@ -78,7 +78,8 @@ PUB ClearPersistInt{}
     writereg(core#TRANS_SPECIAL, core#SF_CLRALSINT, 0, 0)
 
 PUB DataReady{}: flag
-' Indicates ADCs completed integration cycle since AEN bit was set
+' Flag indicating new luminosity data is ready
+'   Returns: TRUE (-1) or FALSE (0)
     flag := 0
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AVALID) & 1) == 1
@@ -91,14 +92,14 @@ PUB DeviceID{}: id
 
 PUB ForceInt{}
 ' Force an ALS Interrupt
-' NOTE: Per TLS2591 Datasheet, for an interrupt to be visible on the INT pin,
-'  one of the interrupt enable bits in the ENABLE ($00) register must be set.
-'  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
+' NOTE: An active interrupt will always be visible using Interrupt(),
+'   however, to be visible on the INT pin, IntsEnabled() or
+'   PersistIntsEnabled() must be set to TRUE
     writereg(core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
 PUB Gain(gainx): curr_gain
 ' Set gain gainx/factor
-'   Valid values: 1, 25, 428, 9876
+'   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
     curr_gain := 0
     readreg(core#CONTROL, 1, @curr_gain)
@@ -114,7 +115,7 @@ PUB Gain(gainx): curr_gain
 
 PUB IntegrationTime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
-'   Valid values: 100, 200, 300, 400, 500, 600
+'   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
     curr_time := 0
     readreg(core#CONTROL, 1, @curr_time)
@@ -131,13 +132,16 @@ PUB IntegrationTime(time_ms): curr_time
 PUB Interrupt{}: flag
 ' Flag indicating a non-persistent interrupt has been triggered
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
+'   NOTE: An active interrupt will always be visible using Interrupt(),
+'       however, to be visible on the INT pin, EnableInts() or EnablePersist()
+'       must be set to TRUE
     flag := 0
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#NPINTR) & 1) == 1
 
 PUB IntsEnabled(state): curr_state
 ' Enable non-persistent interrupts
-'   Valid values: TRUE (1 or -1), FALSE (0)
+'   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
@@ -152,9 +156,11 @@ PUB IntsEnabled(state): curr_state
 
 PUB IntThresh(low, high): curr_thr
 ' Set non-persistent interrupt thresholds
-'   Valid values for low and high thresholds: 0..65535
+'   Valid values for low and high thresholds: 0..65535 (default: 0, 0)
 '   Any other value polls the chip and returns the current setting
-'       (high threshold will be returned in upper word of result, low threshold in lower word)
+'   Returns:
+'       [31..16]: high threshold
+'       [15..0]: low threshold
     curr_thr := 0
     readreg(core#NPAILTL, 4, @curr_thr)
     case low
@@ -189,7 +195,7 @@ PUB Measure(channel): lum_data
 '       %00 - Full spectrum
 '       %01 - IR
 '       %10 - Visible
-'       %11 - Both (most-significant word: IR, least-signficant word: Full-spectrum)
+'       %11 - Both (Returns: [31..16]: IR, [15..0]: Full-spectrum)
 '   Any other values ignored
     lum_data := 0
     readreg(core#C0DATAL, 4, @lum_data)
@@ -217,14 +223,20 @@ PUB PackageID{}: id
 PUB PersistInt{}: flag
 ' Flag indicating a persistent interrupt has been triggered
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
+'   NOTE: An active interrupt will always be visible using PersistInt(),
+'       however, to be visible on the INT pin, PersistIntsEnabled()
+'       must be set to TRUE
     flag := 0
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AINT) & 1) == 1
 
 PUB PersistIntCycles(cycles): curr_cyc
-' Set number of consecutive cycles necessary to generate an interrupt (i.e., persistence)
+' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
-'       0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
+'       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
+'       Special cases:
+'           0: Every cycle generates an interrupt, regardless of value
+'           1: Any value outside the threshold generates an interrupt
 '   Any other value polls the chip and returns the current setting
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
@@ -241,8 +253,7 @@ PUB PersistIntCycles(cycles): curr_cyc
 PUB PersistIntsEnabled(state): curr_state
 ' Enable persistent interrupts
 '   Valid values:
-'       TRUE (1 or -1): Enabled
-'       FALSE (0): Disabled
+'       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
@@ -260,8 +271,8 @@ PUB PersistIntThresh(low, high): curr_thr
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
 '   Returns:
-'       Most Significant Word: High threshold
-'       Least Significant Word: Low threshold
+'       [31..16]: High threshold
+'       [15..0]: Low threshold
     curr_thr := 0
     readreg(core#AILTL, 4, @curr_thr)
     case low
@@ -285,8 +296,7 @@ PUB PersistIntThresh(low, high): curr_thr
 PUB Powered(state): curr_state
 ' Enable sensor power
 '   Valid values:
-'       TRUE (1 or -1): Power on
-'       FALSE (0): Power off
+'       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
@@ -306,8 +316,7 @@ PUB Reset{}
 PUB SensorEnabled(state): curr_state
 ' Enable ambient light sensor ADCs
 '   Valid values:
-'       TRUE (1 or -1): Enabled
-'       FALSE (0): Disabled
+'       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
@@ -323,8 +332,7 @@ PUB SensorEnabled(state): curr_state
 PUB SleepAfterInt(state): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
-'       TRUE (1 or -1): Enable
-'       FALSE (0): Disable
+'       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := 0
     readreg(core#ENABLE, 1, @curr_state)
