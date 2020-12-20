@@ -77,18 +77,17 @@ PUB ClearPersistInt{}
 ' Clears ALS Interrupt
     writereg(core#TRANS_SPECIAL, core#SF_CLRALSINT, 0, 0)
 
-PUB DataReady{}
+PUB DataReady{}: flag
 ' Indicates ADCs completed integration cycle since AEN bit was set
-    result := $00
-    readreg(core#STATUS, 1, @result)
-    return ((result >> core#AVALID) & 1) == 1
+    flag := 0
+    readreg(core#STATUS, 1, @flag)
+    return ((flag >> core#AVALID) & 1) == 1
 
-PUB DeviceID{}
+PUB DeviceID{}: id
 ' Device ID of chip
 '   Known values: $50
-    result := $00
-    readreg(core#ID, 1, @result)
-    result &= $FF
+    id := 0
+    readreg(core#ID, 1, @id)
 
 PUB ForceInt{}
 ' Force an ALS Interrupt
@@ -97,80 +96,80 @@ PUB ForceInt{}
 '  i.e., make sure you've called EnableInts(TRUE) or EnablePersist (TRUE)
     writereg(core#TRANS_SPECIAL, core#SF_FORCEINT, 0, 0)
 
-PUB Gain(multiplier) | tmp
+PUB Gain(multiplier): curr_gain
 ' Set gain multiplier/factor
 '   Valid values: 1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#CONTROL, 1, @tmp)
+    curr_gain := 0
+    readreg(core#CONTROL, 1, @curr_gain)
     case multiplier
         1, 25, 428, 9876:
             multiplier := lookdownz(multiplier: 1, 25, 428, 9876) << core#AGAIN
         other:
-            result := (tmp >> core#AGAIN) & core#AGAIN_BITS
-            return lookupz(result: 1, 25, 428, 9876)
+            curr_gain := (curr_gain >> core#AGAIN) & core#AGAIN_BITS
+            return lookupz(curr_gain: 1, 25, 428, 9876)
 
-    tmp &= core#AGAIN_MASK
-    tmp := (tmp | multiplier) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, tmp)
+    curr_gain &= core#AGAIN_MASK
+    curr_gain := (curr_gain | multiplier) & core#CONTROL_MASK
+    writereg(core#TRANS_NORMAL, core#CONTROL, 1, curr_gain)
 
-PUB IntegrationTime(time_ms) | tmp
+PUB IntegrationTime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: 100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#CONTROL, 1, @tmp)
+    curr_time := 0
+    readreg(core#CONTROL, 1, @curr_time)
     case time_ms
         100, 200, 300, 400, 500, 600:
             time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
         other:
-            result := tmp & core#ATIME_BITS
+            result := curr_time & core#ATIME_BITS
             return lookupz(result: 100, 200, 300, 400, 500, 600)
 
-    tmp &= core#ATIME_MASK
-    tmp := (tmp | time_ms) & core#CONTROL_MASK
-    writereg(core#TRANS_NORMAL, core#CONTROL, 1, tmp)
+    curr_time &= core#ATIME_MASK
+    curr_time := (curr_time | time_ms) & core#CONTROL_MASK
+    writereg(core#TRANS_NORMAL, core#CONTROL, 1, curr_time)
 
-PUB Interrupt{}
-' Indicates if a non-persistent interrupt has been triggered
+PUB Interrupt{}: flag
+' Flag indicating a non-persistent interrupt has been triggered
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
-    result := $00
-    readreg(core#STATUS, 1, @result)
-    result := ((result >> core#NPINTR) & 1) == 1
+    flag := 0
+    readreg(core#STATUS, 1, @flag)
+    return ((flag >> core#NPINTR) & 1) == 1
 
-PUB IntsEnabled(enabled) | tmp
+PUB IntsEnabled(state): curr_state
 ' Enable non-persistent interrupts
-'   Valid values: TRUE (1 or -1): interrupts enabled, FALSE (0) disables interrupts
+'   Valid values: TRUE (1 or -1): interrupts state, FALSE (0) disables interrupts
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#ENABLE, 1, @tmp)
-    case ||(enabled)
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
         0, 1:
-            enabled := ||(enabled) << core#NPIEN
+            state := ||(state) << core#NPIEN
         other:
-            return ((tmp >> core#NPIEN) & 1) == 1
+            return ((curr_state >> core#NPIEN) & 1) == 1
 
-    tmp &= core#NPIEN_MASK
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    curr_state &= core#NPIEN_MASK
+    curr_state := (curr_state | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
-PUB IntThresh(low, high) | tmp
+PUB IntThresh(low, high): curr_thr
 ' Set non-persistent interrupt thresholds
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
 '       (high threshold will be returned in upper word of result, low threshold in lower word)
-    tmp := 0
-    readreg(core#NPAILTL, 4, @tmp)
+    curr_thr := 0
+    readreg(core#NPAILTL, 4, @curr_thr)
     case low
         0..65535:
         other:
-            result.word[0] := tmp.word[0]
+            result.word[0] := curr_thr.word[0]
 
     case high
         0..65535:
             high := (high << 16) | low
         other:
-            result.word[1] := tmp.word[1]
+            result.word[1] := curr_thr.word[1]
 
     case result
         0:
@@ -179,15 +178,15 @@ PUB IntThresh(low, high) | tmp
 
     writereg(core#TRANS_NORMAL, core#NPAILTL, 4, high)
 
-PUB LastFull{}
+PUB LastFull{}: fsdata
 ' Returns full-spectrum data from last measurement
     return _fullspec_counts
 
-PUB LastIR{}
+PUB LastIR{}: irdata
 ' Returns infra-red data from last measurement
     return _ir_counts
 
-PUB Measure(channel) | tmp
+PUB Measure(channel): lum_data
 ' Get luminosity data from sensor
 '   Valid values:
 '       %00 - Full spectrum
@@ -195,156 +194,155 @@ PUB Measure(channel) | tmp
 '       %10 - Visible
 '       %11 - Both (most-significant word: IR, least-signficant word: Full-spectrum)
 '   Any other values ignored
-    tmp := 0
-    readreg(core#C0DATAL, 4, @tmp)
+    lum_data := 0
+    readreg(core#C0DATAL, 4, @lum_data)
     case channel
         %00:
-            result := tmp.word[0] & $FFFF
+            lum_data := lum_data.word[0] & $FFFF
         %01:
-            result := tmp.word[1] & $FFFF
+            lum_data := lum_data.word[1] & $FFFF
         %10:
-            result := (tmp.word[0] - tmp.word[1]) & $FFFF
+            lum_data := (lum_data.word[0] - lum_data.word[1]) & $FFFF
         %11:
-            result := tmp
+            lum_data := lum_data
         other:
             return
 
-    _ir_counts := tmp.word[1] & $FFFF
-    _fullspec_counts := tmp.word[0] & $FFFF
+    _ir_counts := lum_data.word[1] & $FFFF
+    _fullspec_counts := lum_data.word[0] & $FFFF
 
-PUB PackageID{}
+PUB PackageID{}: id
 ' Returns Package ID
 '   Known values: $00
-    result := $00
-    readreg(core#PID, 1, @result)
+    id := 0
+    readreg(core#PID, 1, @id)
 
-PUB PersistInt{}
+PUB PersistInt{}: flag
 ' Indicates if a persistent interrupt has been triggered
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
-    result := $00
-    readreg(core#STATUS, 1, @result)
-    result := ((result >> core#AINT) & 1) == 1
+    flag := 0
+    readreg(core#STATUS, 1, @flag)
+    return ((flag >> core#AINT) & 1) == 1
 
-PUB PersistIntCycles(cycles) | tmp
+PUB PersistIntCycles(cycles): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt (i.e., persistence)
 '   Valid values:
 '       0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#PERSIST, 1, @tmp)
+    curr_cyc := 0
+    readreg(core#PERSIST, 1, @curr_cyc)
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
             cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
         other:
-            tmp &= core#APERS_BITS
-            result := lookupz(tmp: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
-            return
+            curr_cyc &= core#APERS_BITS
+            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
 
-    tmp := cycles & core#PERSIST_MASK
-    writereg(core#TRANS_NORMAL, core#PERSIST, 1, tmp)
+    curr_cyc := cycles & core#PERSIST_MASK
+    writereg(core#TRANS_NORMAL, core#PERSIST, 1, curr_cyc)
 
-PUB PersistIntsEnabled(enabled) | tmp
+PUB PersistIntsEnabled(state): curr_state
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1): Enabled
 '       FALSE (0): Disabled
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#ENABLE, 1, @tmp)
-    case ||(enabled)
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
         0, 1:
-            enabled := ||(enabled) << core#AIEN
+            state := ||(state) << core#AIEN
         other:
-            return ((tmp >> core#AIEN) & 1) == 1
+            return ((curr_state >> core#AIEN) & 1) == 1
 
-    tmp &= core#AIEN_MASK
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    curr_state &= core#AIEN_MASK
+    curr_state := (curr_state | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
-PUB PersistIntThresh(low, high) | tmp
+PUB PersistIntThresh(low, high): curr_thr | curr_thr
 ' Sets trigger threshold values for persistent ALS interrupts
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
 '   Returns:
 '       Most Significant Word: High threshold
 '       Least Significant Word: Low threshold
-    tmp := 0
-    readreg(core#AILTL, 4, @tmp)
+    curr_thr := 0
+    readreg(core#AILTL, 4, @curr_thr)
     case low
         0..65535:
         other:
-            result.word[0] := tmp.word[0]
+            curr_thr.word[0] := curr_thr.word[0]
 
     case high
         0..65535:
             high := (high << 16) | low
         other:
-            result.word[1] := tmp.word[1]
+            curr_thr.word[1] := curr_thr.word[1]
 
-    case result
+    case curr_thr
         0:
         other:
-            return result
+            return curr_thr
 
     writereg(core#TRANS_NORMAL, core#AILTL, 4, high)
 
-PUB Powered(enabled) | tmp
+PUB Powered(state): curr_state
 ' Enable sensor power
 '   Valid values:
 '       TRUE (1 or -1): Power on
 '       FALSE (0): Power off
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#ENABLE, 1, @tmp)
-    case ||(enabled)
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
         0, 1:
-            enabled := ||(enabled)
+            state := ||(state)
         other:
-            return (tmp & 1) == 1
+            return (curr_state & 1) == 1
 
-    tmp &= core#PON_MASK
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    curr_state &= core#PON_MASK
+    curr_state := (curr_state | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
 PUB Reset{}
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core#TRANS_NORMAL, core#CONTROL, 1, 1 << core#SRESET)
 
-PUB SensorEnabled(enabled) | tmp
+PUB SensorEnabled(state): curr_state
 ' Enable ambient light sensor ADCs
 '   Valid values:
 '       TRUE (1 or -1): Enabled
 '       FALSE (0): Disabled
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#ENABLE, 1, @tmp)
-    case ||(enabled)
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
         0, 1:
-            enabled := ||(enabled) << core#AEN
+            state := ||(state) << core#AEN
         other:
-            return ((tmp >> core#AEN) & 1) == 1
+            return ((curr_state >> core#AEN) & 1) == 1
 
-    tmp &= core#AEN_MASK
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    curr_state &= core#AEN_MASK
+    curr_state := (curr_state | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
-PUB SleepAfterInt(enabled) | tmp
+PUB SleepAfterInt(state): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1): Enable
 '       FALSE (0): Disable
 '   Any other value polls the chip and returns the current setting
-    tmp := 0
-    readreg(core#ENABLE, 1, @tmp)
-    case ||(enabled)
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
         0, 1:
-            enabled := ||(enabled) << core#SAI
+            state := ||(state) << core#SAI
         other:
-            return ((tmp >> core#SAI) & 1) == 1
+            return ((curr_state >> core#SAI) & 1) == 1
 
-    tmp &= core#SAI_MASK
-    tmp := (tmp | enabled) & core#ENABLE_MASK
-    writereg(core#TRANS_NORMAL, core#ENABLE, 1, tmp)
+    curr_state &= core#SAI_MASK
+    curr_state := (curr_state | state) & core#ENABLE_MASK
+    writereg(core#TRANS_NORMAL, core#ENABLE, 1, curr_state)
 
 PRI readReg(reg, nr_bytes, buff_addr) | cmd_packet[2], tmp
 'Read nr_bytes from register 'reg' to address 'addr_buff'
