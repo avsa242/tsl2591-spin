@@ -396,14 +396,14 @@ PUB readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr | core#CMD_NORMAL
 
-            i2c.start()
+            i2c.start{}
             repeat tmp from 0 to 1
                 i2c.write(cmd_pkt.byte[tmp])
 
             i2c.wait(SLAVE_RD)
             repeat tmp from 0 to nr_bytes-1
                 byte[ptr_buff][tmp] := i2c.read(tmp == nr_bytes-1)
-            i2c.stop()
+            i2c.stop{}
         other:
             return
 
