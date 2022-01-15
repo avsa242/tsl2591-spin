@@ -21,15 +21,18 @@ This is a P8X32A/Propeller, P2X8C4M64P/Propeller 2 driver object for the AMS TSL
 
 P1/SPIN1:
 * spin-standard-library
-* P1/SPIN1: 1 extra core/cog for the PASM I2C driver
+* P1/SPIN1: 1 extra core/cog for the PASM I2C engine
 
 P2/SPIN2:
 * p2-spin-standard-library
 
 ## Compiler Compatibility
 
-* P1/SPIN1: OpenSpin (tested with 1.00.81)
-* P2/SPIN2: FlexSpin (tested with 5.0.0)
+* P1/SPIN1 OpenSpin (bytecode): OK, tested with 1.00.81
+* P1/SPIN1 FlexSpin (bytecode): OK, tested with 5.9.7-beta
+* P1/SPIN1 FlexSpin (native): OK, tested with 5.9.7-beta
+* ~~P2/SPIN2 FlexSpin (nu-code): FTBFS, tested with 5.9.7-beta~~
+* P2/SPIN2 FlexSpin (native): OK, tested with 5.9.7-beta
 * ~~BST~~ (incompatible - no preprocessor)
 * ~~Propeller Tool~~ (incompatible - no preprocessor)
 * ~~PNut~~ (incompatible - no preprocessor)
@@ -39,8 +42,3 @@ P2/SPIN2:
 * Very early in development - may malfunction or outright fail to build
 * Luminosity calculation is currently unverified
 
-## TODO
-
-- [x] Clean up the demo object
-- [ ] Verify luminosity readings against certified/calibrated device
-- [ ] Implement better/multiple LUX calculations
