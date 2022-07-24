@@ -40,7 +40,6 @@ PUB Main() | tmp, ir, full
 
     repeat
         repeat until tsl2591.dataready()
-
         tmp := tsl2591.alsdata()
         ir := tmp.word[1]
         full := tmp.word[0]                     ' full-spectrum: IR + visible
