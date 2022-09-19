@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2022
     Started Nov 23, 2019
-    Updated Jul 24, 2022
+    Updated Sep 19, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -50,14 +50,14 @@ OBJ
     core: "core.con.tsl2591"
     time: "time"
 
-PUB Null{}
+PUB null{}
 ' This is not a top-level object
 
-PUB Start{}: status
+PUB start{}: status
 ' Start using "standard" Propeller I2C pins and 100kHz
     return startx(DEF_SCL, DEF_SDA, DEF_HZ)
 
-PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
+PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom settings
     if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
 }   I2C_HZ =< core#I2C_MAX_FREQ
@@ -72,16 +72,18 @@ PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
     ' Lastly - make sure you have at least one free core/cog
     return FALSE
 
-PUB Stop{}
-' Kills I2C cog
+PUB stop{}
+' Stop the driver
     powered(FALSE)
     i2c.deinit{}
+    longfill(@_cpl, 0, 7)
+    wordfill(@_ir_adc, 0, 2)
 
-PUB Defaults{}
+PUB defaults{}
 ' Factory default settings
     reset{}
 
-PUB Preset_ALS{}
+PUB preset_als{}
 ' Factory defaults, with sensor enabled
     reset{}
     powered(TRUE)
@@ -91,7 +93,7 @@ PUB Preset_ALS{}
     gain(1)
     integrationtime(100)
 
-PUB ALSData{}: als_adc
+PUB alsdata{}: als_adc
 ' Read Ambient Light Sensor data
 '   Returns: u16:u16 [31..16]: IR, [15..0]: Full-spectrum (IR+Vis)
     readreg(core#C0DATAL, 4, @als_adc)
@@ -100,43 +102,43 @@ PUB ALSData{}: als_adc
     _ir_adc_scl := _ir_adc * FPSCALE
     _full_adc_scl := _full_adc * FPSCALE
 
-PUB ClearAllInts{}
+PUB clearallints{}
 ' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
     writereg(core#SF_CLRALS_NP_INT, 0, 0)
 
-PUB ClearInt{}
+PUB clearint{}
 ' Clears NPALS Interrupt
     writereg(core#SF_CLR_NP_INT, 0, 0)
 
-PUB ClearPersistInt{}
+PUB clearpersistint{}
 ' Clears ALS Interrupt
     writereg(core#SF_CLRALSINT, 0, 0)
 
-PUB DataReady{}: flag
+PUB dataready{}: flag
 ' Flag indicating new luminosity data is ready
 '   Returns: TRUE (-1) or FALSE (0)
     flag := 0
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AVALID) & 1) == 1
 
-PUB DeviceFactor(df)
+PUB devicefactor(df)
 ' Set device factor
     _dev_fact := df
 
-PUB DeviceID{}: id
+PUB deviceid{}: id
 ' Device ID of chip
 '   Known values: $50
     id := 0
     readreg(core#ID, 1, @id)
 
-PUB ForceInt{}
+PUB forceint{}
 ' Force an ALS Interrupt
 ' NOTE: An active interrupt will always be visible using Interrupt(),
 '   however, to be visible on the INT pin, IntsEnabled() or
 '   PersistIntsEnabled() must be set to TRUE
     writereg(core#SF_FORCEINT, 0, 0)
 
-PUB Gain(gainx): curr_gain
+PUB gain(gainx): curr_gain
 ' Set gain gainx/factor
 '   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
@@ -154,11 +156,11 @@ PUB Gain(gainx): curr_gain
     writereg(core#CONTROL, 1, gainx)
     updatecpl{}                                 ' update counts per lux equ.
 
-PUB GlassAttenuation(ga)
+PUB glassattenuation(ga)
 ' Set glass attenuation factor
     _glass_att := ga
 
-PUB IntegrationTime(time_ms): curr_time
+PUB integrationtime(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
@@ -176,7 +178,7 @@ PUB IntegrationTime(time_ms): curr_time
     writereg(core#CONTROL, 1, time_ms)
     updatecpl{}                                 ' update counts per lux equ.
 
-PUB Interrupt{}: flag
+PUB interrupt{}: flag
 ' Flag indicating a non-persistent interrupt has been triggered
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
 '   NOTE: An active interrupt will always be visible using Interrupt(),
@@ -186,7 +188,7 @@ PUB Interrupt{}: flag
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#NPINTR) & 1) == 1
 
-PUB IntsEnabled(state): curr_state
+PUB intsenabled(state): curr_state
 ' Enable non-persistent interrupts
 '   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
@@ -201,7 +203,7 @@ PUB IntsEnabled(state): curr_state
     state := ((curr_state & core#NPIEN_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PUB IntThresh(low, high): curr_thr
+PUB intthresh(low, high): curr_thr
 ' Set non-persistent interrupt thresholds
 '   Valid values for low and high thresholds: 0..65535 (default: 0, 0)
 '   Any other value polls the chip and returns the current setting
@@ -228,30 +230,30 @@ PUB IntThresh(low, high): curr_thr
 
     writereg(core#NPAILTL, 4, high)
 
-PUB LastFull{}: fsdata
+PUB lastfull{}: fsdata
 ' Returns full-spectrum data from last measurement
     return _full_adc
 
-PUB LastIR{}: irdata
+PUB lastir{}: irdata
 ' Returns infra-red data from last measurement
     return _ir_adc
 
-PUB LastLux{}: l
+PUB lastlux{}: l
 ' Return Lux from last measurement (scale = 1000x)
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
-PUB Lux{}: l
+PUB lux{}: l
 ' Return Lux from live measurement (scale = 1000x)
     alsdata{}                                   ' read ALS, but discard return val
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
-PUB PackageID{}: id
+PUB packageid{}: id
 ' Returns Package ID
 '   Known values: $00
     id := 0
     readreg(core#PID, 1, @id)
 
-PUB PersistInt{}: flag
+PUB persistint{}: flag
 ' Flag indicating a persistent interrupt has been triggered
 '   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
 '   NOTE: An active interrupt will always be visible using PersistInt(),
@@ -261,7 +263,7 @@ PUB PersistInt{}: flag
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AINT) & 1) == 1
 
-PUB PersistIntCycles(cycles): curr_cyc
+PUB persistintcycles(cycles): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
@@ -281,7 +283,7 @@ PUB PersistIntCycles(cycles): curr_cyc
             return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
 }           40, 45, 50, 55, 60)
 
-PUB PersistIntsEnabled(state): curr_state
+PUB persistintsenabled(state): curr_state
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -297,7 +299,7 @@ PUB PersistIntsEnabled(state): curr_state
     state := ((curr_state & core#AIEN_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PUB PersistIntThresh(low, high): curr_thr
+PUB persistintthresh(low, high): curr_thr
 ' Sets trigger threshold values for persistent ALS interrupts
 '   Valid values for low and high thresholds: 0..65535
 '   Any other value polls the chip and returns the current setting
@@ -324,7 +326,7 @@ PUB PersistIntThresh(low, high): curr_thr
 
     writereg(core#AILTL, 4, high)
 
-PUB Powered(state): curr_state
+PUB powered(state): curr_state
 ' Enable sensor power
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -340,11 +342,11 @@ PUB Powered(state): curr_state
     state := ((curr_state & core#PON_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PUB Reset{}
+PUB reset{}
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core#CONTROL, 1, 1 << core#SRESET)
 
-PUB SensorEnabled(state): curr_state
+PUB sensorenabled(state): curr_state
 ' Enable ambient light sensor ADCs
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -360,7 +362,7 @@ PUB SensorEnabled(state): curr_state
     state := ((curr_state & core#AEN_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PUB SleepAfterInt(state): curr_state
+PUB sleepafterint(state): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -376,11 +378,11 @@ PUB SleepAfterInt(state): curr_state
     state := ((curr_state & core#SAI_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PRI updateCPL{}
+PRI updatecpl{}
 ' Update counts-per-lux, used in Lux calculations
     _cpl := ((_itime * _gain) * FPSCALE) / (_glass_att * _dev_fact)
 
-PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
+PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
 ' Read nr_bytes from device into ptr_buff
     case reg_nr
         core#ENABLE, core#CONTROL, core#AILTL..core#PERSIST,{
@@ -396,7 +398,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
         other:
             return
 
-PRI writeReg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
+PRI writereg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
 ' Write nr_bytes from val to device
     case reg_nr
         core#ENABLE, core#CONTROL, core#AILTL..core#PERSIST:
@@ -425,24 +427,21 @@ PRI writeReg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
 
 DAT
 {
-TERMS OF USE: MIT License
+Copyright 2022 Jesse Burt
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }
 
