@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2022
     Started Nov 23, 2019
-    Updated Sep 19, 2022
+    Updated Sep 26, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -20,6 +20,10 @@ CON
     DEF_HZ          = 100_000
 
     FPSCALE         = 1_000                     ' fixed-point math scale
+
+' Operating modes
+    STDBY           = 0
+    CONT            = 1
 
 ' Gain settings
     GAIN_LOW        = 0
@@ -59,11 +63,10 @@ PUB start{}: status
 
 PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom settings
-    if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
-}   I2C_HZ =< core#I2C_MAX_FREQ
+    if (lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and I2C_HZ =< core#I2C_MAX_FREQ)
         if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
             time.usleep(core#T_POR)
-            if deviceid{} == core#DEV_ID_RESP
+            if (dev_id{} == core#DEV_ID_RESP)
                 reset{}
                 return
 
@@ -87,13 +90,13 @@ PUB preset_als{}
 ' Factory defaults, with sensor enabled
     reset{}
     powered(TRUE)
-    sensorenabled(TRUE)
-    devicefactor(408)
-    glassattenuation(1)
-    gain(1)
-    integrationtime(100)
+    opmode(CONT)
+    dev_factor(408)
+    glass_atten(1)
+    als_gain(1)
+    integration_time(100)
 
-PUB alsdata{}: als_adc
+PUB als_data{}: als_adc
 ' Read Ambient Light Sensor data
 '   Returns: u16:u16 [31..16]: IR, [15..0]: Full-spectrum (IR+Vis)
     readreg(core#C0DATAL, 4, @als_adc)
@@ -102,44 +105,25 @@ PUB alsdata{}: als_adc
     _ir_adc_scl := _ir_adc * FPSCALE
     _full_adc_scl := _full_adc * FPSCALE
 
-PUB clearallints{}
-' Clears both ALS (persistent) and NPALS (non-persistent) Interrupts
-    writereg(core#SF_CLRALS_NP_INT, 0, 0)
-
-PUB clearint{}
-' Clears NPALS Interrupt
-    writereg(core#SF_CLR_NP_INT, 0, 0)
-
-PUB clearpersistint{}
-' Clears ALS Interrupt
-    writereg(core#SF_CLRALSINT, 0, 0)
-
-PUB dataready{}: flag
+PUB als_data_rdy{}: flag
 ' Flag indicating new luminosity data is ready
 '   Returns: TRUE (-1) or FALSE (0)
     flag := 0
     readreg(core#STATUS, 1, @flag)
     return ((flag >> core#AVALID) & 1) == 1
 
-PUB devicefactor(df)
+PUB dev_factor(df)
 ' Set device factor
     _dev_fact := df
 
-PUB deviceid{}: id
+PUB dev_id{}: id
 ' Device ID of chip
 '   Known values: $50
     id := 0
     readreg(core#ID, 1, @id)
 
-PUB forceint{}
-' Force an ALS Interrupt
-' NOTE: An active interrupt will always be visible using Interrupt(),
-'   however, to be visible on the INT pin, IntsEnabled() or
-'   PersistIntsEnabled() must be set to TRUE
-    writereg(core#SF_FORCEINT, 0, 0)
-
-PUB gain(gainx): curr_gain
-' Set gain gainx/factor
+PUB als_gain(gainx): curr_gain
+' Set gain gain/factor
 '   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
     curr_gain := 0
@@ -154,13 +138,13 @@ PUB gain(gainx): curr_gain
 
     gainx := ((curr_gain & core#AGAIN_MASK) | gainx) & core#CONTROL_MASK
     writereg(core#CONTROL, 1, gainx)
-    updatecpl{}                                 ' update counts per lux equ.
+    update_cpl{}                                 ' update counts per lux equ.
 
-PUB glassattenuation(ga)
+PUB glass_atten(ga)
 ' Set glass attenuation factor
     _glass_att := ga
 
-PUB integrationtime(time_ms): curr_time
+PUB integration_time(time_ms): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
@@ -176,94 +160,22 @@ PUB integrationtime(time_ms): curr_time
 
     time_ms := ((curr_time & core#ATIME_MASK) | time_ms) & core#CONTROL_MASK
     writereg(core#CONTROL, 1, time_ms)
-    updatecpl{}                                 ' update counts per lux equ.
+    update_cpl{}                                 ' update counts per lux equ.
 
-PUB interrupt{}: flag
-' Flag indicating a non-persistent interrupt has been triggered
-'   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
-'   NOTE: An active interrupt will always be visible using Interrupt(),
-'       however, to be visible on the INT pin, EnableInts() or EnablePersist()
-'       must be set to TRUE
-    flag := 0
-    readreg(core#STATUS, 1, @flag)
-    return ((flag >> core#NPINTR) & 1) == 1
+PUB int_clr(mask)
+' Clear interrupts
+'   mask bits: (set a bit to clear the interrupt)
+'       1: non-persistent interrupt
+'       0: als interrupt
+    case mask
+        %01:
+            writereg(core#SF_CLRALSINT, 0, 0)
+        %10:
+            writereg(core#SF_CLR_NP_INT, 0, 0)
+        %11:
+            writereg(core#SF_CLRALS_NP_INT, 0, 0)
 
-PUB intsenabled(state): curr_state
-' Enable non-persistent interrupts
-'   Valid values: TRUE (1 or -1), *FALSE (0)
-'   Any other value polls the chip and returns the current setting
-    curr_state := 0
-    readreg(core#ENABLE, 1, @curr_state)
-    case ||(state)
-        0, 1:
-            state := ||(state) << core#NPIEN
-        other:
-            return ((curr_state >> core#NPIEN) & 1) == 1
-
-    state := ((curr_state & core#NPIEN_MASK) | state) & core#ENABLE_MASK
-    writereg(core#ENABLE, 1, state)
-
-PUB intthresh(low, high): curr_thr
-' Set non-persistent interrupt thresholds
-'   Valid values for low and high thresholds: 0..65535 (default: 0, 0)
-'   Any other value polls the chip and returns the current setting
-'   Returns:
-'       [31..16]: high threshold
-'       [15..0]: low threshold
-    curr_thr := 0
-    readreg(core#NPAILTL, 4, @curr_thr)
-    case low
-        0..65535:
-        other:
-            return curr_thr.word[0]
-
-    case high
-        0..65535:
-            high := (high << 16) | low
-        other:
-            return curr_thr.word[1]
-
-    case curr_thr
-        0:
-        other:
-            return curr_thr
-
-    writereg(core#NPAILTL, 4, high)
-
-PUB lastfull{}: fsdata
-' Returns full-spectrum data from last measurement
-    return _full_adc
-
-PUB lastir{}: irdata
-' Returns infra-red data from last measurement
-    return _ir_adc
-
-PUB lastlux{}: l
-' Return Lux from last measurement (scale = 1000x)
-    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
-
-PUB lux{}: l
-' Return Lux from live measurement (scale = 1000x)
-    alsdata{}                                   ' read ALS, but discard return val
-    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
-
-PUB packageid{}: id
-' Returns Package ID
-'   Known values: $00
-    id := 0
-    readreg(core#PID, 1, @id)
-
-PUB persistint{}: flag
-' Flag indicating a persistent interrupt has been triggered
-'   Returns: TRUE (-1) an interrupt, FALSE (0) otherwise
-'   NOTE: An active interrupt will always be visible using PersistInt(),
-'       however, to be visible on the INT pin, PersistIntsEnabled()
-'       must be set to TRUE
-    flag := 0
-    readreg(core#STATUS, 1, @flag)
-    return ((flag >> core#AINT) & 1) == 1
-
-PUB persistintcycles(cycles): curr_cyc
+PUB int_duration(cycles): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
@@ -283,7 +195,29 @@ PUB persistintcycles(cycles): curr_cyc
             return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
 }           40, 45, 50, 55, 60)
 
-PUB persistintsenabled(state): curr_state
+PUB int_ena(state): curr_state
+' Enable non-persistent interrupts
+'   Valid values: TRUE (1 or -1), *FALSE (0)
+'   Any other value polls the chip and returns the current setting
+    curr_state := 0
+    readreg(core#ENABLE, 1, @curr_state)
+    case ||(state)
+        0, 1:
+            state := ||(state) << core#NPIEN
+        other:
+            return ((curr_state >> core#NPIEN) & 1) == 1
+
+    state := ((curr_state & core#NPIEN_MASK) | state) & core#ENABLE_MASK
+    writereg(core#ENABLE, 1, state)
+
+PUB int_force{}
+' Force an ALS Interrupt
+' NOTE: An active interrupt will always be visible using Interrupt(),
+'   however, to be visible on the INT pin, IntsEnabled() or
+'   PersistIntsEnabled() must be set to TRUE
+    writereg(core#SF_FORCEINT, 0, 0)
+
+PUB int_latch_ena(state): curr_state
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -299,32 +233,88 @@ PUB persistintsenabled(state): curr_state
     state := ((curr_state & core#AIEN_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PUB persistintthresh(low, high): curr_thr
-' Sets trigger threshold values for persistent ALS interrupts
-'   Valid values for low and high thresholds: 0..65535
+PUB int_hi_thresh{}: thresh
+' Get interrupt high threshold
+    thresh := 0
+    if (int_latch_ena(-2))
+        readreg(core#AIHTL, 2, @thresh)
+    else
+        readreg(core#NPAIHTL, 2, @thresh)
+
+PUB int_lo_thresh{}: thresh
+' Get interrupt low threshold
+    thresh := 0
+    if (int_latch_ena(-2))
+        readreg(core#AILTL, 2, @thresh)
+    else
+        readreg(core#NPAILTL, 2, @thresh)
+
+PUB int_set_hi_thresh(thresh)
+' Set interrupt high threshold
+'   Valid values: 0..65535 (clamped to range)
+    thresh := 0 #> thresh <# 65535
+    if (int_latch_ena(-2))
+        writereg(core#AIHTL, 2, @thresh)
+    else
+        writereg(core#NPAIHTL, 2, @thresh)
+
+PUB int_set_lo_thresh(thresh)
+' Set interrupt low threshold
+'   Valid values: 0..65535 (clamped to range)
+    thresh := 0 #> thresh <# 65535
+    if (int_latch_ena(-2))
+        writereg(core#AILTL, 2, @thresh)
+    else
+        writereg(core#NPAILTL, 2, @thresh)
+
+PUB interrupt{}: flag
+' Flag indicating interrupt has been triggered
+'   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
+'   NOTE: An active interrupt will always be visible using interrupt(), however, to be visible on
+'       the INT pin, int_ena() or int_latch_ena() must be set to TRUE
+    flag := 0
+    readreg(core#STATUS, 1, @flag)
+    return (flag & core#STATUS_MASK)
+
+PUB last_full{}: fsdata
+' Returns full-spectrum data from last measurement
+    return _full_adc
+
+PUB last_ir{}: irdata
+' Returns infra-red data from last measurement
+    return _ir_adc
+
+PUB last_lux{}: l
+' Return Lux from last measurement (scale = 1000x)
+    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+
+PUB lux{}: l
+' Return Lux from live measurement (scale = 1000x)
+    als_data{}                                  ' read ALS, but discard return val
+    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+
+PUB opmode(mode): curr_mode
+' Set device operating mode
+'   Valid values:
+'       STDBY (0): stand-by
+'       CONT (1): continuous measurement
 '   Any other value polls the chip and returns the current setting
-'   Returns:
-'       [31..16]: High threshold
-'       [15..0]: Low threshold
-    curr_thr := 0
-    readreg(core#AILTL, 4, @curr_thr)
-    case low
-        0..65535:
+    curr_mode := 0
+    readreg(core#ENABLE, 1, @curr_mode)
+    case mode
+        STDBY, CONT:
+            mode := ||(mode) << core#AEN
         other:
-            return curr_thr.word[0]
+            return ((curr_mode >> core#AEN) & 1) == 1
 
-    case high
-        0..65535:
-            high := (high << 16) | low
-        other:
-            return curr_thr.word[1]
+    mode := ((curr_mode & core#AEN_MASK) | mode) & core#ENABLE_MASK
+    writereg(core#ENABLE, 1, mode)
 
-    case curr_thr
-        0:
-        other:
-            return curr_thr
-
-    writereg(core#AILTL, 4, high)
+PUB pkg_id{}: id
+' Returns Package ID
+'   Known values: $00
+    id := 0
+    readreg(core#PID, 1, @id)
 
 PUB powered(state): curr_state
 ' Enable sensor power
@@ -346,23 +336,7 @@ PUB reset{}
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core#CONTROL, 1, 1 << core#SRESET)
 
-PUB sensorenabled(state): curr_state
-' Enable ambient light sensor ADCs
-'   Valid values:
-'       TRUE (1 or -1), *FALSE (0)
-'   Any other value polls the chip and returns the current setting
-    curr_state := 0
-    readreg(core#ENABLE, 1, @curr_state)
-    case ||(state)
-        0, 1:
-            state := ||(state) << core#AEN
-        other:
-            return ((curr_state >> core#AEN) & 1) == 1
-
-    state := ((curr_state & core#AEN_MASK) | state) & core#ENABLE_MASK
-    writereg(core#ENABLE, 1, state)
-
-PUB sleepafterint(state): curr_state
+PUB slp_after_int(state): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -378,7 +352,7 @@ PUB sleepafterint(state): curr_state
     state := ((curr_state & core#SAI_MASK) | state) & core#ENABLE_MASK
     writereg(core#ENABLE, 1, state)
 
-PRI updatecpl{}
+PRI update_cpl{}
 ' Update counts-per-lux, used in Lux calculations
     _cpl := ((_itime * _gain) * FPSCALE) / (_glass_att * _dev_fact)
 
