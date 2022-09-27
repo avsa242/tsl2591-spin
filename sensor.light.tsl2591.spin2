@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2022
     Started Nov 23, 2019
-    Updated Sep 26, 2022
+    Updated Sep 27, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -84,7 +84,7 @@ PUB preset_als()
     dev_factor(408)
     glass_atten(1)
     als_gain(1)
-    integration_time(100)
+    als_integr_time(100)
 
 PUB als_data(): als_adc
 ' Read Ambient Light Sensor data
@@ -130,11 +130,7 @@ PUB als_gain(gainx=-2): curr_gain
     writereg(core.CONTROL, 1, gainx)
     update_cpl()                                 ' update counts per lux equ.
 
-PUB glass_atten(ga)
-' Set glass attenuation factor
-    _glass_att := ga
-
-PUB integration_time(time_ms=-2): curr_time
+PUB als_integr_time(time_ms=-2): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
@@ -151,6 +147,10 @@ PUB integration_time(time_ms=-2): curr_time
     time_ms := ((curr_time & core.ATIME_MASK) | time_ms) & core.CONTROL_MASK
     writereg(core.CONTROL, 1, time_ms)
     update_cpl()                                 ' update counts per lux equ.
+
+PUB glass_atten(ga)
+' Set glass attenuation factor
+    _glass_att := ga
 
 PUB int_clr(mask)
 ' Clear interrupts
