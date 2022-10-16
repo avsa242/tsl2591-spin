@@ -6,7 +6,7 @@
         * Lux data output
     Copyright (c) 2022
     Started Jul 23, 2022
-    Updated Sep 27, 2022
+    Updated Oct 16, 2022
     See end of file for terms of use.
     --------------------------------------------
 
@@ -34,8 +34,8 @@ CON
 
 OBJ
 
-    cfg:    "core.con.boardcfg.flip"
-    sensr:  "sensor.light.tsl2591"
+    cfg:    "boardcfg.flip"
+    sensor:  "sensor.light.tsl2591"
     ser:    "com.serial.terminal.ansi"
     time:   "time"
 
@@ -46,16 +46,16 @@ PUB setup{}
     ser.clear{}
     ser.strln(string("Serial terminal started"))
 
-    if (sensr.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
+    if (sensor.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
         ser.strln(string("TSL2591 driver started"))
     else
         ser.strln(string("TSL2591 driver failed to start - halting"))
         repeat
 
-    sensr.preset_als{}
+    sensor.preset_als{}
 
-    sensr.glass_atten(GA)
-    sensr.dev_factor(DF)
+    sensor.glass_atten(GA)
+    sensor.dev_factor(DF)
     demo{}
 
 #include "luxdemo.common.spinh"                ' code common to all lux demos
