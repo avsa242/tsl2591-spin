@@ -5,7 +5,7 @@
     Author: Jesse Burt
     Copyright (c) 2022
     Started Nov 23, 2019
-    Updated Nov 10, 2022
+    Updated Dec 2, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -162,7 +162,7 @@ PUB glass_atten(ga)
 ' Set glass attenuation factor
     _glass_att := ga
 
-PUB int_clr(mask)
+PUB int_clear(mask)
 ' Clear interrupts
 '   mask bits: (set a bit to clear the interrupt)
 '       1: non-persistent interrupt
@@ -336,7 +336,7 @@ PUB reset{}
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core#CONTROL, 1, (1 << core#SRESET))
 
-PUB slp_after_int(state): curr_state
+PUB sleep_after_int(state): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
