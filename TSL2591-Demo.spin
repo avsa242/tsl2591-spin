@@ -9,6 +9,9 @@
 ----------------------------------------------------------------------------------------------------
 }
 
+' Uncomment the next two lines to use the bytecode-based I2C engine in the driver.
+'#define TSL2591_I2C_BC
+'#pragma exportdef(TSL2591_I2C_BC)
 
 CON
 
