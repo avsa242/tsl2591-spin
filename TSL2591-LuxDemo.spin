@@ -1,9 +1,10 @@
 {
 ----------------------------------------------------------------------------------------------------
-    Filename:       TSL2591-Demo.spin
+    Filename:       TSL2591-LuxDemo.spin
     Description:    Demo of the TSL2591 driver
+        * Lux data output
     Author:         Jesse Burt
-    Started:        Nov 23, 2019
+    Started:        Jul 23, 2022
     Updated:        Jun 2, 2024
     Copyright (c) 2024 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
@@ -18,29 +19,18 @@ CON
     _clkmode    = cfg._clkmode
     _xinfreq    = cfg._xinfreq
 
+' -- User-modifiable constants
+    GA          = 1                             ' Glass attenuation factor
+    DF          = 408                           ' Device factor
+' --
+
 
 OBJ
 
-    cfg:        "boardcfg.flip"
-    time:       "time"
-    ser:        "com.serial.terminal.ansi" | SER_BAUD=115_200
-    tsl2591:    "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
-
-
-PUB main() | tmp, ir, full
-
-    setup()
-
-    tsl2591.preset_als()                        ' set up for ambient light sensing
-
-    repeat
-        repeat until tsl2591.als_data_rdy()
-        tmp := tsl2591.als_data()
-        ir := tmp.word[1]
-        full := tmp.word[0]                     ' full-spectrum: IR + visible
-        ser.pos_xy(0, 3)
-        ser.printf1(@"IR: %04.4x\n\r", ir)
-        ser.printf1(@"Full: %04.4x", full)
+    cfg:    "boardcfg.flip"
+    time:   "time"
+    ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
+    sensor: "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
 
 
 PUB setup()
@@ -50,11 +40,19 @@ PUB setup()
     ser.clear()
     ser.strln(@"Serial terminal started")
 
-    if ( tsl2591.start() )
+    if ( sensor.start() )
         ser.strln(@"TSL2591 driver started")
     else
         ser.strln(@"TSL2591 driver failed to start - halting")
         repeat
+
+    sensor.preset_als()
+
+    sensor.glass_atten(GA)
+    sensor.dev_factor(DF)
+    demo()
+
+#include "luxdemo.common.spinh"                ' code common to all lux demos
 
 
 DAT
