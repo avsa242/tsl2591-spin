@@ -1,29 +1,31 @@
 {
-    --------------------------------------------
-    Filename: sensor.light.tsl2591.spin2
-    Description: Driver for the TSL2591 I2C Light/lux sensor (P2 version)
-    Author: Jesse Burt
-    Copyright (c) 2022
-    Started Nov 23, 2019
-    Updated Dec 2, 2022
-    See end of file for terms of use.
-    --------------------------------------------
+----------------------------------------------------------------------------------------------------
+    Filename:       sensor.light.tsl2591.spin2
+    Description:    Driver for the TSL2591 I2C Light/lux sensor
+    Author:         Jesse Burt
+    Started:        Nov 23, 2019
+    Updated:        Jun 2, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
 }
+
 
 CON
 
     SLAVE_WR        = core.SLAVE_ADDR
     SLAVE_RD        = core.SLAVE_ADDR|1
 
+    DEF_SCL         = 0
+    DEF_SDA         = 1
     DEF_HZ          = 100_000
 
     FPSCALE         = 1_000                     ' fixed-point math scale
 
-' Gain settings
-
 ' Operating modes
     STDBY           = 0
     CONT            = 1
+
+' Gain settings
     GAIN_LOW        = 0
     GAIN_MED        = 1
     GAIN_HI         = 2
@@ -35,19 +37,23 @@ CON
     VISIBLE         = 2
     BOTH            = 3
 
+
 VAR
 
     long _cpl, _itime, _gain, _glass_att, _dev_fact
     long _ir_adc_scl, _full_adc_scl
     word _ir_adc, _full_adc
 
+
 OBJ
 
-    i2c     : "com.i2c"                         ' I2C engine
-    core    : "core.con.tsl2591"
+    i2c:    "com.i2c"                           ' I2C engine
+    core:   "core.con.tsl2591"                  ' TSL2591-specific constants
+
 
 PUB null()
 ' This is not a top-level object
+
 
 PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom settings
@@ -65,6 +71,7 @@ PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
     ' Lastly - make sure you have at least one free core/cog
     return FALSE
 
+
 PUB stop()
 ' Stop the driver
     powered(FALSE)
@@ -72,9 +79,11 @@ PUB stop()
     longfill(@_cpl, 0, 7)
     wordfill(@_ir_adc, 0, 2)
 
+
 PUB defaults()
 ' Factory default settings
     reset()
+
 
 PUB preset_als()
 ' Factory defaults, with sensor enabled
@@ -86,6 +95,7 @@ PUB preset_als()
     als_gain(1)
     als_integr_time(100)
 
+
 PUB als_data(): als_adc
 ' Read Ambient Light Sensor data
 '   Returns: u16:u16 [31..16]: IR, [15..0]: Full-spectrum (IR+Vis)
@@ -95,12 +105,14 @@ PUB als_data(): als_adc
     _ir_adc_scl := (_ir_adc * FPSCALE)
     _full_adc_scl := (_full_adc * FPSCALE)
 
+
 PUB als_data_rdy(): flag
 ' Flag indicating new luminosity data is ready
 '   Returns: TRUE (-1) or FALSE (0)
     flag := 0
     readreg(core.STATUS, 1, @flag)
     return (((flag >> core.AVALID) & 1) == 1)
+
 
 PUB als_gain(gainx=-2): curr_gain
 ' Set gain gain/factor
@@ -120,6 +132,7 @@ PUB als_gain(gainx=-2): curr_gain
     writereg(core.CONTROL, 1, gainx)
     update_cpl()                                 ' update counts per lux equ.
 
+
 PUB als_integr_time(time_ms=-2): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
@@ -138,9 +151,11 @@ PUB als_integr_time(time_ms=-2): curr_time
     writereg(core.CONTROL, 1, time_ms)
     update_cpl()                                 ' update counts per lux equ.
 
+
 PUB dev_factor(df)
 ' Set device factor
     _dev_fact := df
+
 
 PUB dev_id(): id
 ' Device ID of chip
@@ -148,9 +163,11 @@ PUB dev_id(): id
     id := 0
     readreg(core.ID, 1, @id)
 
+
 PUB glass_atten(ga)
 ' Set glass attenuation factor
     _glass_att := ga
+
 
 PUB int_clear(mask)
 ' Clear interrupts
@@ -159,11 +176,12 @@ PUB int_clear(mask)
 '       0: als interrupt
     case mask
         %01:
-            writereg(core#SF_CLRALSINT, 0, 0)
+            writereg(core.SF_CLRALSINT, 0, 0)
         %10:
-            writereg(core#SF_CLR_NP_INT, 0, 0)
+            writereg(core.SF_CLR_NP_INT, 0, 0)
         %11:
-            writereg(core#SF_CLRALS_NP_INT, 0, 0)
+            writereg(core.SF_CLRALS_NP_INT, 0, 0)
+
 
 PUB int_duration(cycles=-2): curr_cyc 
 ' Set number of consecutive cycles necessary to generate an interrupt
@@ -176,14 +194,13 @@ PUB int_duration(cycles=-2): curr_cyc
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
             writereg(core.PERSIST, 1, curr_cyc)
-            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
-}           40, 45, 50, 55, 60)
+            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
         other:
             curr_cyc := 0
             readreg(core.PERSIST, 1, @curr_cyc)
             curr_cyc &= core.APERS_BITS
-            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35,{
-}           40, 45, 50, 55, 60)
+            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+
 
 PUB int_ena(state=-2): curr_state
 ' Enable non-persistent interrupts
@@ -200,12 +217,14 @@ PUB int_ena(state=-2): curr_state
     state := ((curr_state & core.NPIEN_MASK) | state) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, state)
 
+
 PUB int_force()
 ' Force an ALS Interrupt
 ' NOTE: An active interrupt will always be visible using interrupt(),
 '   however, to be visible on the INT pin, int_ena() or
 '  int_latch_ena() must be set to TRUE
     writereg(core.SF_FORCEINT, 0, 0)
+
 
 PUB int_latch_ena(state=-2): curr_state
 ' Enable persistent interrupts
@@ -223,39 +242,44 @@ PUB int_latch_ena(state=-2): curr_state
     state := ((curr_state & core.AIEN_MASK) | state) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, state)
 
+
 PUB int_hi_thresh{}: thresh
 ' Get interrupt high threshold
     thresh := 0
     if (int_latch_ena(-2))
-        readreg(core#AIHTL, 2, @thresh)
+        readreg(core.AIHTL, 2, @thresh)
     else
-        readreg(core#NPAIHTL, 2, @thresh)
+        readreg(core.NPAIHTL, 2, @thresh)
+
 
 PUB int_lo_thresh{}: thresh
 ' Get interrupt low threshold
     thresh := 0
     if (int_latch_ena(-2))
-        readreg(core#AILTL, 2, @thresh)
+        readreg(core.AILTL, 2, @thresh)
     else
-        readreg(core#NPAILTL, 2, @thresh)
+        readreg(core.NPAILTL, 2, @thresh)
+
 
 PUB int_set_hi_thresh(thresh)
 ' Set interrupt high threshold
 '   Valid values: 0..65535 (clamped to range)
     thresh := 0 #> thresh <# 65535
     if (int_latch_ena(-2))
-        writereg(core#AIHTL, 2, @thresh)
+        writereg(core.AIHTL, 2, @thresh)
     else
-        writereg(core#NPAIHTL, 2, @thresh)
+        writereg(core.NPAIHTL, 2, @thresh)
+
 
 PUB int_set_lo_thresh(thresh)
 ' Set interrupt low threshold
 '   Valid values: 0..65535 (clamped to range)
     thresh := 0 #> thresh <# 65535
     if (int_latch_ena(-2))
-        writereg(core#AILTL, 2, @thresh)
+        writereg(core.AILTL, 2, @thresh)
     else
-        writereg(core#NPAILTL, 2, @thresh)
+        writereg(core.NPAILTL, 2, @thresh)
+
 
 PUB interrupt(): flag
 ' Flag indicating interrupt has been triggered
@@ -264,24 +288,29 @@ PUB interrupt(): flag
 '       the INT pin, int_ena() or int_latch_ena() must be set to TRUE
     flag := 0
     readreg(core.STATUS, 1, @flag)
-    return (flag & core#STATUS_MASK)
+    return (flag & core.STATUS_MASK)
+
 
 PUB last_full(): fsdata
 ' Returns full-spectrum data from last measurement
     return _full_adc
 
+
 PUB last_ir(): irdata
 ' Returns infra-red data from last measurement
     return _ir_adc
+
 
 PUB last_lux(): l
 ' Return Lux from last measurement (scale = 1000x)
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
+
 PUB lux(): l
 ' Return Lux from live measurement (scale = 1000x)
     als_data()                                  ' read ALS, but discard return val
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+
 
 PUB opmode(mode=-2): curr_mode
 ' Set device operating mode
@@ -300,11 +329,13 @@ PUB opmode(mode=-2): curr_mode
     mode := ((curr_mode & core.AEN_MASK) | mode) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, mode)
 
+
 PUB pkg_id(): id
 ' Returns Package ID
 '   Known values: $00
     id := 0
     readreg(core.PID, 1, @id)
+
 
 PUB powered(state=-2): curr_state
 ' Enable sensor power
@@ -322,9 +353,11 @@ PUB powered(state=-2): curr_state
     state := ((curr_state & core.PON_MASK) | state) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, state)
 
+
 PUB reset()
 ' Resets the TSL2591 (equivalent to POR)
     writereg(core.CONTROL, 1, (1 << core.SRESET))
+
 
 PUB sleep_after_int(state=-2): curr_state
 ' Enable Sleep After Interrupt
@@ -342,15 +375,16 @@ PUB sleep_after_int(state=-2): curr_state
     state := ((curr_state & core.SAI_MASK) | state) & core.ENABLE_MASK
     writereg(core.ENABLE, 1, state)
 
+
 PRI update_cpl()
 ' Update counts-per-lux, used in Lux calculations
     _cpl := ((_itime * _gain) * FPSCALE) / (_glass_att * _dev_fact)
 
+
 PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
 ' Read nr_bytes from device into ptr_buff
     case reg_nr
-        core.ENABLE, core.CONTROL, core.AILTL..core.PERSIST,{
-}       core.PID..core.C1DATAH:
+        core.ENABLE, core.CONTROL, core.AILTL..core.PERSIST, core.PID..core.C1DATAH:
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr | core.CMD_NORMAL
 
@@ -362,13 +396,13 @@ PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp
         other:
             return
 
+
 PRI writereg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
 ' Write nr_bytes from val to device
     case reg_nr
         core.ENABLE, core.CONTROL, core.AILTL..core.PERSIST:
             reg_nr |= core.CMD_NORMAL
-        core.SF_FORCEINT, core.SF_CLRALSINT, core.SF_CLRALS_NP_INT,{
-}       core.SF_CLR_NP_INT:
+        core.SF_FORCEINT, core.SF_CLRALSINT, core.SF_CLRALS_NP_INT, core.SF_CLR_NP_INT:
             nr_bytes := 0
             val := 0
         other:
@@ -389,9 +423,10 @@ PRI writereg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
     i2c.wrblock_lsbf(@cmd_pkt, nr_bytes+2)
     i2c.stop()
 
+
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
