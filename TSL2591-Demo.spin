@@ -15,24 +15,13 @@ CON
     _clkmode    = cfg._clkmode
     _xinfreq    = cfg._xinfreq
 
-' -- User-modifiable constants
-    LED         = cfg.LED1
-    SER_BAUD    = 115_200
-
-    SCL_PIN     = 28
-    SDA_PIN     = 29
-    I2C_FREQ    = 400_000                       ' max is 400_000
-' --
-
-    DAT_COL     = 20
-
 
 OBJ
 
     cfg:        "boardcfg.flip"
     time:       "time"
-    ser:        "com.serial.terminal.ansi"
-    tsl2591:    "sensor.light.tsl2591"
+    ser:        "com.serial.terminal.ansi" | SER_BAUD=115_200
+    tsl2591:    "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
 
 
 PUB main() | tmp, ir, full
@@ -53,12 +42,12 @@ PUB main() | tmp, ir, full
 
 PUB setup()
 
-    ser.start(SER_BAUD)
+    ser.start()
     time.msleep(30)
     ser.clear()
     ser.strln(@"Serial terminal started")
 
-    if ( tsl2591.startx(SCL_PIN, SDA_PIN, I2C_FREQ) )
+    if ( tsl2591.start() )
         ser.strln(@"TSL2591 driver started")
     else
         ser.strln(@"TSL2591 driver failed to start - halting")

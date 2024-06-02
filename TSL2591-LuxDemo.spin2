@@ -1,50 +1,40 @@
 {
-    --------------------------------------------
-    Filename: TSL2591-LuxDemo.spin2
-    Author: Jesse Burt
-    Description: TSL2591 driver demo (P2 version)
+----------------------------------------------------------------------------------------------------
+    Filename:       TSL2591-LuxDemo.spin2
+    Description:    Demo of the TSL2591 driver
         * Lux data output
-    Copyright (c) 2022
-    Started Jul 23, 2022
-    Updated Oct 16, 2022
-    See end of file for terms of use.
-    --------------------------------------------
-
-    Build-time symbols supported by driver:
-        N/A
+    Author:         Jesse Burt
+    Started:        Jul 23, 2022
+    Updated:        Jun 2, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
 }
+
 CON
 
     _clkfreq    = cfg._clkfreq_def
     _xtlfreq    = cfg._xtlfreq
 
 ' -- User-modifiable constants
-    SER_BAUD    = 2_000_000
-
-    { I2C configuration }
-    SCL_PIN     = 0
-    SDA_PIN     = 1
-    I2C_FREQ    = 400_000                       ' max is 400_000
-    ADDR_BITS   = 0
-
     GA          = 1                             ' Glass attenuation factor
     DF          = 408                           ' Device factor
 ' --
 
+
 OBJ
 
     cfg:    "boardcfg.p2eval"
-    sensor:  "sensor.light.tsl2591"
-    ser:    "com.serial.terminal.ansi"
+    ser:    "com.serial.terminal.ansi" | SER_BAUD=2_000_000
+    sensor:  "sensor.light.tsl2591" | SCL=0, SDA=1, I2C_FREQ=400_000
+
 
 PUB setup()
 
-    ser.start(SER_BAUD)
-    waitms(10)
+    ser.start()
     ser.clear()
     ser.strln(@"Serial terminal started")
 
-    if (sensor.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
+    if ( sensor.start() )
         ser.strln(@"TSL2591 driver started")
     else
         ser.strln(@"TSL2591 driver failed to start - halting")
@@ -58,9 +48,10 @@ PUB setup()
 
 #include "luxdemo.common.spin2h"                ' code common to all lux demos
 
+
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

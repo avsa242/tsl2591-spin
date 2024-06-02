@@ -12,6 +12,29 @@
 
 CON
 
+    { default I/O configuration - these can be overridden by the parent object }
+    SCL             = 28
+    SDA             = 29
+    I2C_FREQ        = 100_000
+
+
+    { opmode() modes }
+    STDBY           = 0
+    CONT            = 1
+
+    { gain() settings }
+    GAIN_LOW        = 0
+    GAIN_MED        = 1
+    GAIN_HI         = 2
+    GAIN_MAX        = 3
+
+    { sensor channels }
+    FULL            = 0
+    IR              = 1
+    VISIBLE         = 2
+    BOTH            = 3
+
+
     SLAVE_WR        = core.SLAVE_ADDR
     SLAVE_RD        = core.SLAVE_ADDR|1
 
@@ -20,22 +43,6 @@ CON
     DEF_HZ          = 100_000
 
     FPSCALE         = 1_000                     ' fixed-point math scale
-
-' Operating modes
-    STDBY           = 0
-    CONT            = 1
-
-' Gain settings
-    GAIN_LOW        = 0
-    GAIN_MED        = 1
-    GAIN_HI         = 2
-    GAIN_MAX        = 3
-
-' Sensor channels
-    FULL            = 0
-    IR              = 1
-    VISIBLE         = 2
-    BOTH            = 3
 
 
 VAR
@@ -62,16 +69,16 @@ PUB null()
 
 
 PUB start(): status
-' Start using "standard" Propeller I2C pins and 100kHz
-    return startx(DEF_SCL, DEF_SDA, DEF_HZ)
+' Start using default I/O settings
+    return startx(SCL, SDA, I2C_FREQ)
 
 
 PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom settings
-    if (lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and I2C_HZ =< core.I2C_MAX_FREQ)
-        if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
+    if ( lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) )
+        if ( status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ) )
             time.usleep(core.T_POR)
-            if (dev_id() == core.DEV_ID_RESP)
+            if ( dev_id() == core.DEV_ID_RESP )
                 reset()
                 return
 
