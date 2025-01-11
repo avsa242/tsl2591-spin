@@ -4,8 +4,8 @@
     Description:    Driver for the TSL2591 I2C Light/lux sensor
     Author:         Jesse Burt
     Started:        Nov 23, 2019
-    Updated:        Jun 2, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        Jan 10, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -209,8 +209,8 @@ PUB int_duration(cycles): curr_cyc
 '   Any other value polls the chip and returns the current setting
     case cycles
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
-            writereg(core.PERSIST, 1, curr_cyc)
             cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+            writereg(core.PERSIST, 1, cycles)
         other:
             curr_cyc := 0
             readreg(core.PERSIST, 1, @curr_cyc)
@@ -442,7 +442,7 @@ PRI writereg(reg_nr, nr_bytes, val) | cmd_pkt[2], tmp
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
