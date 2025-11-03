@@ -129,7 +129,7 @@ PUB als_data_rdy(): flag
     return (((flag >> core.AVALID) & 1) == 1)
 
 
-PUB als_gain(gainx): curr_gain
+PUB als_gain(gainx=-2): curr_gain
 ' Set gain gain/factor
 '   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
@@ -147,7 +147,7 @@ PUB als_gain(gainx): curr_gain
     update_cpl()                                 ' update counts per lux equ.
 
 
-PUB als_integr_time(time_ms): curr_time
+PUB als_integr_time(time_ms=-2): curr_time
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
@@ -195,7 +195,7 @@ PUB int_clear(mask)
             writereg(core.SF_CLRALS_NP_INT, 0)
 
 
-PUB int_duration(cycles): curr_cyc
+PUB int_duration(cycles=-2): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
@@ -213,7 +213,7 @@ PUB int_duration(cycles): curr_cyc
             return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
 
 
-PUB int_ena(state): curr_state
+PUB int_ena(state=-2): curr_state
 ' Enable non-persistent interrupts
 '   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
@@ -236,7 +236,7 @@ PUB int_force()
     writereg(core.SF_FORCEINT, 0)
 
 
-PUB int_latch_ena(state): curr_state
+PUB int_latch_ena(state=-2): curr_state
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -320,7 +320,7 @@ PUB lux(): l
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
 
-PUB opmode(mode): curr_mode
+PUB opmode(mode=-2): curr_mode
 ' Set device operating mode
 '   Valid values:
 '       STDBY (0): stand-by
@@ -343,7 +343,7 @@ PUB pkg_id(): id
     id := readreg(core.PID)
 
 
-PUB powered(state): curr_state
+PUB powered(state=-2): curr_state
 ' Enable sensor power
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
@@ -364,7 +364,7 @@ PUB reset()
     writereg(core.CONTROL, (1 << core.SRESET))
 
 
-PUB sleep_after_int(state): curr_state
+PUB sleep_after_int(state=-2): curr_state
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)

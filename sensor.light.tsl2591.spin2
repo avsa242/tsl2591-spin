@@ -191,7 +191,7 @@ PUB int_clear(mask)
             writereg(core.SF_CLRALS_NP_INT, 0)
 
 
-PUB int_duration(cycles=-2): curr_cyc 
+PUB int_duration(cycles=-2): curr_cyc
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
