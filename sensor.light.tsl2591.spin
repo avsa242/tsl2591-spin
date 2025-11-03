@@ -218,9 +218,9 @@ PUB int_ena(state): curr_state
 '   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := readreg(core.ENABLE)
-    case ||(state)
+    case abs(state)
         0, 1:
-            state := ||(state) << core.NPIEN
+            state := abs(state) << core.NPIEN
         other:
             return (((curr_state >> core.NPIEN) & 1) == 1)
 
@@ -242,9 +242,9 @@ PUB int_latch_ena(state): curr_state
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := readreg(core.ENABLE)
-    case ||(state)
+    case abs(state)
         0, 1:
-            state := ||(state) << core.AIEN
+            state := abs(state) << core.AIEN
         other:
             return (((curr_state >> core.AIEN) & 1) == 1)
 
@@ -329,7 +329,7 @@ PUB opmode(mode): curr_mode
     curr_mode := readreg(core.ENABLE)
     case mode
         STDBY, CONT:
-            mode := ||(mode) << core.AEN
+            mode := abs(mode) << core.AEN
         other:
             return (((curr_mode >> core.AEN) & 1) == 1)
 
@@ -349,9 +349,9 @@ PUB powered(state): curr_state
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := readreg(core.ENABLE)
-    case ||(state)
+    case abs(state)
         0, 1:
-            state := ||(state)
+            state := abs(state)
         other:
             return ((curr_state & 1) == 1)
 
@@ -370,9 +370,9 @@ PUB sleep_after_int(state): curr_state
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
     curr_state := readreg(core.ENABLE)
-    case ||(state)
+    case abs(state)
         0, 1:
-            state := ||(state) << core.SAI
+            state := abs(state) << core.SAI
         other:
             return (((curr_state >> core.SAI) & 1) == 1)
 
