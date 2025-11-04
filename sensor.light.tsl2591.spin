@@ -38,18 +38,19 @@ CON
     SLAVE_WR        = core.SLAVE_ADDR
     SLAVE_RD        = core.SLAVE_ADDR|1
 
-    DEF_SCL         = 28
-    DEF_SDA         = 29
-    DEF_HZ          = 100_000
 
     FPSCALE         = 1_000                     ' fixed-point math scale
 
 
 VAR
 
-    long _cpl, _itime, _gain, _glass_att, _dev_fact
-    long _ir_adc_scl, _full_adc_scl
-    word _ir_adc, _full_adc
+    long _cpl                                   ' counts per unit Lux
+    long _itime                                 ' ADC integration time
+    long _gain                                  ' ADC gain factor
+    long _glass_att                             ' glass attenuation
+    long _dev_fact                              ' device factor
+    long _ir_adc_scl, _full_adc_scl             ' ADC scale
+    word _ir_adc, _full_adc                     ' last ADC data
 
 
 OBJ
