@@ -5,8 +5,8 @@
         * Lux data output
     Author:         Jesse Burt
     Started:        Jul 23, 2022
-    Updated:        Jun 2, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        Nov 4, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -16,8 +16,8 @@
 
 CON
 
-    _clkmode    = cfg._clkmode
-    _xinfreq    = cfg._xinfreq
+    _clkmode    = xtal1+pll16x
+    _xinfreq    = 5_000_000
 
 ' -- User-modifiable constants
     GA          = 1                             ' Glass attenuation factor
@@ -27,10 +27,21 @@ CON
 
 OBJ
 
-    cfg:    "boardcfg.flip"
-    time:   "time"
     ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
     sensor: "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
+    time:   "time"
+
+
+PUB main() | lux
+
+    setup()
+
+    repeat
+        repeat
+        until sensor.als_data_rdy()
+        ser.pos_xy(0, 3)
+        lux := sensor.lux()
+        ser.printf(@"Illuminance (lux): %4.4d.%02.2d\n\r", (lux / 1000), abs(lux // 1000) )
 
 
 PUB setup()
@@ -50,14 +61,11 @@ PUB setup()
 
     sensor.glass_atten(GA)
     sensor.dev_factor(DF)
-    demo()
-
-#include "luxdemo.common.spinh"                ' code common to all lux demos
 
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

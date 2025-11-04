@@ -4,8 +4,8 @@
     Description:    Demo of the TSL2591 driver
     Author:         Jesse Burt
     Started:        Nov 23, 2019
-    Updated:        Jun 2, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        Nov 4, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -15,32 +15,32 @@
 
 CON
 
-    _clkmode    = cfg._clkmode
-    _xinfreq    = cfg._xinfreq
+    _clkmode    = xtal1+pll16x
+    _xinfreq    = 5_000_000
 
 
 OBJ
 
-    cfg:        "boardcfg.flip"
-    time:       "time"
-    ser:        "com.serial.terminal.ansi" | SER_BAUD=115_200
-    tsl2591:    "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
+    ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
+    sensor: "sensor.light.tsl2591" | SCL=28, SDA=29, I2C_FREQ=400_000
+    time:   "time"
 
 
 PUB main() | tmp, ir, full
 
     setup()
 
-    tsl2591.preset_als()                        ' set up for ambient light sensing
+    sensor.preset_als()                         ' set up for ambient light sensing
 
     repeat
-        repeat until tsl2591.als_data_rdy()
-        tmp := tsl2591.als_data()
+        repeat
+        until sensor.als_data_rdy()
+        tmp := sensor.als_data()
         ir := tmp.word[1]
         full := tmp.word[0]                     ' full-spectrum: IR + visible
         ser.pos_xy(0, 3)
-        ser.printf1(@"IR: %04.4x\n\r", ir)
-        ser.printf1(@"Full: %04.4x", full)
+        ser.printf(@"IR: %04.4x\n\r", ir)
+        ser.printf(@"Full: %04.4x", full)
 
 
 PUB setup()
@@ -50,7 +50,7 @@ PUB setup()
     ser.clear()
     ser.strln(@"Serial terminal started")
 
-    if ( tsl2591.start() )
+    if ( sensor.start() )
         ser.strln(@"TSL2591 driver started")
     else
         ser.strln(@"TSL2591 driver failed to start - halting")
@@ -59,7 +59,7 @@ PUB setup()
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
