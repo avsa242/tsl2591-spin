@@ -108,21 +108,21 @@ PUB preset_als()
     als_integr_time(100)
 
 
-PUB als_data(): als_adc
+PUB als_data(): d
 ' Read Ambient Light Sensor data
 '   Returns: u16:u16 [31..16]: IR, [15..0]: Full-spectrum (IR+Vis)
-    als_adc := readreg(core.C0DATAL, 4)
-    _ir_adc := (als_adc.word[1] & $FFFF)
-    _full_adc := (als_adc.word[0] & $FFFF)
+    d := readreg(core.C0DATAL, 4)
+    _ir_adc := (d.word[1] & $FFFF)
+    _full_adc := (d.word[0] & $FFFF)
     _ir_adc_scl := (_ir_adc * FPSCALE)
     _full_adc_scl := (_full_adc * FPSCALE)
 
 
-PUB als_data_rdy(): flag
+PUB als_data_rdy(): r
 ' Flag indicating new luminosity data is ready
 '   Returns: TRUE (-1) or FALSE (0)
-    flag := readreg(core.STATUS)
-    return (((flag >> core.AVALID) & 1) == 1)
+    r := readreg(core.STATUS)
+    return ( ( (r >> core.AVALID) & 1) == 1)
 
 
 PUB als_gain(g=-2): c
@@ -134,7 +134,7 @@ PUB als_gain(g=-2): c
         1, 25, 428, 9876:
             _gain := g
             g := lookdownz(g: 1, 25, 428, 9876) << core.AGAIN
-            g := ((c & core.AGAIN_MASK) | g)
+            g := ( (c & core.AGAIN_MASK) | g)
             writereg(core.CONTROL, g)
             update_cpl()                        ' update counts per lux equ.
         other:
@@ -151,7 +151,7 @@ PUB als_integr_time(t=-2): c
         100, 200, 300, 400, 500, 600:
             _itime := t
             t := lookdownz(t: 100, 200, 300, 400, 500, 600)
-            t := ((c & core.ATIME_MASK) | t)
+            t := ( (c & core.ATIME_MASK) | t)
             writereg(core.CONTROL, t)
             update_cpl()                                 ' update counts per lux equ.
         other:
@@ -215,10 +215,10 @@ PUB int_ena(i=-2): c
     case abs(i)
         0, 1:
             i := abs(i) << core.NPIEN
-            i := ((c & core.NPIEN_MASK) | i) & core.ENABLE_MASK
+            i := ( (c & core.NPIEN_MASK) | i)
             writereg(core.ENABLE, i)
         other:
-            return (((c >> core.NPIEN) & 1) == 1)
+            return ( ( (c >> core.NPIEN) & 1) == 1)
 
 
 PUB int_force()
@@ -238,10 +238,10 @@ PUB int_latch_ena(il=-2): c
     case abs(il)
         0, 1:
             il := abs(il) << core.AIEN
-            il := ((c & core.AIEN_MASK) | il) & core.ENABLE_MASK
+            il := ( (c & core.AIEN_MASK) | il)
             writereg(core.ENABLE, il)
         other:
-            return (((c >> core.AIEN) & 1) == 1)
+            return ( ( (c >> core.AIEN) & 1) == 1)
 
 
 PUB int_hi_thresh(): t
@@ -301,13 +301,13 @@ PUB last_ir(): d
 
 PUB last_lux(): l
 ' Return Lux from last measurement (scale = 1000x)
-    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+    return ( (_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl) ) ) / _cpl
 
 
 PUB lux(): l
 ' Return Lux from live measurement (scale = 1000x)
     als_data()                                  ' read ALS, but discard return val
-    return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
+    return ( (_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl) ) ) / _cpl
 
 
 PUB opmode(m=-2): c
@@ -320,10 +320,10 @@ PUB opmode(m=-2): c
     case m
         STDBY, CONT:
             m := abs(m) << core.AEN
-            m := ((c & core.AEN_MASK) | m) & core.ENABLE_MASK
+            m := ( (c & core.AEN_MASK) | m)
             writereg(core.ENABLE, m)
         other:
-            return (((c >> core.AEN) & 1) == 1)
+            return ( ( (c >> core.AEN) & 1) == 1)
 
 
 PUB pkg_id(): id
@@ -341,10 +341,10 @@ PUB powered(s=-2): c
     case abs(s)
         0, 1:
             s := abs(s)
-            s := ((c & core.PON_MASK) | s) & core.ENABLE_MASK
+            s := ( (c & core.PON_MASK) | s)
             writereg(core.ENABLE, s)
         other:
-            return ((c & 1) == 1)
+            return ( (c & 1) == 1)
 
 
 PUB reset()
@@ -361,10 +361,10 @@ PUB sleep_after_int(s=-2): c
     case abs(s)
         0, 1:
             s := abs(s) << core.SAI
-            s := ((c & core.SAI_MASK) | s) & core.ENABLE_MASK
+            s := ( (c & core.SAI_MASK) | s)
             writereg(core.ENABLE, s)
         other:
-            return (((c >> core.SAI) & 1) == 1)
+            return ( ( (c >> core.SAI) & 1) == 1)
 
 
 PRI update_cpl()
