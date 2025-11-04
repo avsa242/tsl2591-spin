@@ -4,7 +4,7 @@
     Description:    Driver for the TSL2591 I2C Light/lux sensor
     Author:         Jesse Burt
     Started:        Nov 23, 2019
-    Updated:        Nov 3, 2025
+    Updated:        Nov 4, 2025
     Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
@@ -125,40 +125,38 @@ PUB als_data_rdy(): flag
     return (((flag >> core.AVALID) & 1) == 1)
 
 
-PUB als_gain(gainx=-2): curr_gain
+PUB als_gain(g=-2): c
 ' Set gain gain/factor
 '   Valid values: *1, 25, 428, 9876
 '   Any other value polls the chip and returns the current setting
-    curr_gain := readreg(core.CONTROL)
-    case gainx
+    c := readreg(core.CONTROL)
+    case g
         1, 25, 428, 9876:
-            _gain := gainx
-            gainx := lookdownz(gainx: 1, 25, 428, 9876) << core.AGAIN
+            _gain := g
+            g := lookdownz(g: 1, 25, 428, 9876) << core.AGAIN
+            g := ((c & core.AGAIN_MASK) | g)
+            writereg(core.CONTROL, g)
+            update_cpl()                        ' update counts per lux equ.
         other:
-            curr_gain := (curr_gain >> core.AGAIN) & core.AGAIN_BITS
-            return lookupz(curr_gain: 1, 25, 428, 9876)
-
-    gainx := ((curr_gain & core.AGAIN_MASK) | gainx) & core.CONTROL_MASK
-    writereg(core.CONTROL, gainx)
-    update_cpl()                                 ' update counts per lux equ.
+            c := (c >> core.AGAIN) & core.AGAIN_BITS
+            return lookupz(c: 1, 25, 428, 9876)
 
 
-PUB als_integr_time(time_ms=-2): curr_time
+PUB als_integr_time(t=-2): c
 ' Set ADC Integration time, in milliseconds (affects both photodiode channels)
 '   Valid values: *100, 200, 300, 400, 500, 600
 '   Any other value polls the chip and returns the current setting
-    curr_time := readreg(core.CONTROL)
-    case time_ms
+    c := readreg(core.CONTROL)
+    case t
         100, 200, 300, 400, 500, 600:
-            _itime := time_ms
-            time_ms := lookdownz(time_ms: 100, 200, 300, 400, 500, 600)
+            _itime := t
+            t := lookdownz(t: 100, 200, 300, 400, 500, 600)
+            t := ((c & core.ATIME_MASK) | t)
+            writereg(core.CONTROL, t)
+            update_cpl()                                 ' update counts per lux equ.
         other:
-            curr_time &= core.ATIME_BITS
-            return lookupz(curr_time: 100, 200, 300, 400, 500, 600)
-
-    time_ms := ((curr_time & core.ATIME_MASK) | time_ms) & core.CONTROL_MASK
-    writereg(core.CONTROL, time_ms)
-    update_cpl()                                 ' update counts per lux equ.
+            c &= core.ATIME_BITS
+            return lookupz(c: 100, 200, 300, 400, 500, 600)
 
 
 PUB dev_factor(df)
@@ -177,9 +175,9 @@ PUB glass_atten(ga)
     _glass_att := ga
 
 
-PUB int_clear(mask)
+PUB int_clear(m)
 ' Clear interrupts
-'   mask bits: (set a bit to clear the interrupt)
+'   m   bitmask: (set a bit to clear the interrupt)
 '       1: non-persistent interrupt
 '       0: als interrupt
     case mask
@@ -191,7 +189,7 @@ PUB int_clear(mask)
             writereg(core.SF_CLRALS_NP_INT, 0)
 
 
-PUB int_duration(cycles=-2): curr_cyc
+PUB int_duration(d=-2): c
 ' Set number of consecutive cycles necessary to generate an interrupt
 '   Valid values:
 '       *0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
@@ -199,29 +197,28 @@ PUB int_duration(cycles=-2): curr_cyc
 '           0: Every cycle generates an interrupt, regardless of value
 '           1: Any value outside the threshold generates an interrupt
 '   Any other value polls the chip and returns the current setting
-    case cycles
+    case d
         0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60:
-            cycles := lookdownz(cycles: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
-            writereg(core.PERSIST, cycles)
+            d := lookdownz(d: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+            writereg(core.PERSIST, d)
         other:
-            curr_cyc := readreg(core.PERSIST)
-            curr_cyc &= core.APERS_BITS
-            return lookupz(curr_cyc: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
+            c := readreg(core.PERSIST)
+            c &= core.APERS_BITS
+            return lookupz(c: 0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
 
 
-PUB int_ena(state=-2): curr_state
+PUB int_ena(i=-2): c
 ' Enable non-persistent interrupts
 '   Valid values: TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
-    curr_state := readreg(core.ENABLE)
-    case abs(state)
+    c := readreg(core.ENABLE)
+    case abs(i)
         0, 1:
-            state := abs(state) << core.NPIEN
+            i := abs(i) << core.NPIEN
+            i := ((c & core.NPIEN_MASK) | i) & core.ENABLE_MASK
+            writereg(core.ENABLE, i)
         other:
-            return (((curr_state >> core.NPIEN) & 1) == 1)
-
-    state := ((curr_state & core.NPIEN_MASK) | state) & core.ENABLE_MASK
-    writereg(core.ENABLE, state)
+            return (((c >> core.NPIEN) & 1) == 1)
 
 
 PUB int_force()
@@ -232,75 +229,72 @@ PUB int_force()
     writereg(core.SF_FORCEINT, 0)
 
 
-PUB int_latch_ena(state=-2): curr_state
+PUB int_latch_ena(il=-2): c
 ' Enable persistent interrupts
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
-    curr_state := readreg(core.ENABLE)
-    case abs(state)
+    c := readreg(core.ENABLE)
+    case abs(il)
         0, 1:
-            state := abs(state) << core.AIEN
+            il := abs(il) << core.AIEN
+            il := ((c & core.AIEN_MASK) | il) & core.ENABLE_MASK
+            writereg(core.ENABLE, il)
         other:
-            return (((curr_state >> core.AIEN) & 1) == 1)
-
-    state := ((curr_state & core.AIEN_MASK) | state) & core.ENABLE_MASK
-    writereg(core.ENABLE, state)
+            return (((c >> core.AIEN) & 1) == 1)
 
 
-PUB int_hi_thresh(): thresh
+PUB int_hi_thresh(): t
 ' Get interrupt high threshold
-    thresh := 0
-    if (int_latch_ena(-2))
-        thresh := readreg(core.AIHTL, 2)
+    if ( int_latch_ena() )
+        return readreg(core.AIHTL, 2)
     else
-        thresh := readreg(core.NPAIHTL, 2)
+        return readreg(core.NPAIHTL, 2)
 
 
-PUB int_lo_thresh(): thresh
+PUB int_lo_thresh(): t
 ' Get interrupt low threshold
-    thresh := 0
-    if (int_latch_ena(-2))
-        thresh := readreg(core.AILTL, 2)
+    if ( int_latch_ena() )
+        return readreg(core.AILTL, 2)
     else
-        thresh := readreg(core.NPAILTL, 2)
+        return readreg(core.NPAILTL, 2)
 
 
-PUB int_set_hi_thresh(thresh)
+PUB int_set_hi_thresh(t)
 ' Set interrupt high threshold
 '   Valid values: 0..65535 (clamped to range)
-    thresh := 0 #> thresh <# 65535
-    if (int_latch_ena(-2))
-        writereg(core.AIHTL, thresh, 2)
+    t := 0 #> t <# 65535
+    if ( int_latch_ena() )
+        writereg(core.AIHTL, t, 2)
     else
-        writereg(core.NPAIHTL, thresh, 2)
+        writereg(core.NPAIHTL, t, 2)
 
 
-PUB int_set_lo_thresh(thresh)
+PUB int_set_lo_thresh(t)
 ' Set interrupt low threshold
 '   Valid values: 0..65535 (clamped to range)
-    thresh := 0 #> thresh <# 65535
-    if (int_latch_ena(-2))
-        writereg(core.AILTL, thresh, 2)
+    t := 0 #> t <# 65535
+    if ( int_latch_ena() )
+        writereg(core.AILTL, t, 2)
     else
-        writereg(core.NPAILTL, thresh, 2)
+        writereg(core.NPAILTL, t, 2)
 
 
-PUB interrupt(): flag
+PUB interrupt(): f
 ' Flag indicating interrupt has been triggered
 '   Returns: TRUE (-1) if interrupt triggered, FALSE (0) otherwise
 '   NOTE: An active interrupt will always be visible using interrupt(), however, to be visible on
 '       the INT pin, int_ena() or int_latch_ena() must be set to TRUE
-    flag := readreg(core.STATUS)
-    return (flag & core.STATUS_MASK)
+    f := readreg(core.STATUS)
+    return (f & core.STATUS_MASK)
 
 
-PUB last_full(): fsdata
+PUB last_full(): d
 ' Returns full-spectrum data from last measurement
     return _full_adc
 
 
-PUB last_ir(): irdata
+PUB last_ir(): d
 ' Returns infra-red data from last measurement
     return _ir_adc
 
@@ -316,21 +310,20 @@ PUB lux(): l
     return ((_full_adc_scl - _ir_adc_scl) * (FPSCALE - (_ir_adc_scl / _full_adc_scl))) / _cpl
 
 
-PUB opmode(mode=-2): curr_mode
+PUB opmode(m=-2): c
 ' Set device operating mode
 '   Valid values:
 '       STDBY (0): stand-by
 '       CONT (1): continuous measurement
 '   Any other value polls the chip and returns the current setting
-    curr_mode := readreg(core.ENABLE)
-    case mode
+    c := readreg(core.ENABLE)
+    case m
         STDBY, CONT:
-            mode := abs(mode) << core.AEN
+            m := abs(m) << core.AEN
+            m := ((c & core.AEN_MASK) | m) & core.ENABLE_MASK
+            writereg(core.ENABLE, m)
         other:
-            return (((curr_mode >> core.AEN) & 1) == 1)
-
-    mode := ((curr_mode & core.AEN_MASK) | mode) & core.ENABLE_MASK
-    writereg(core.ENABLE, mode)
+            return (((c >> core.AEN) & 1) == 1)
 
 
 PUB pkg_id(): id
@@ -339,20 +332,19 @@ PUB pkg_id(): id
     id := readreg(core.PID)
 
 
-PUB powered(state=-2): curr_state
+PUB powered(s=-2): c
 ' Enable sensor power
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
-    curr_state := readreg(core.ENABLE)
-    case abs(state)
+    c := readreg(core.ENABLE)
+    case abs(s)
         0, 1:
-            state := abs(state)
+            s := abs(s)
+            s := ((c & core.PON_MASK) | s) & core.ENABLE_MASK
+            writereg(core.ENABLE, s)
         other:
-            return ((curr_state & 1) == 1)
-
-    state := ((curr_state & core.PON_MASK) | state) & core.ENABLE_MASK
-    writereg(core.ENABLE, state)
+            return ((c & 1) == 1)
 
 
 PUB reset()
@@ -360,20 +352,19 @@ PUB reset()
     writereg(core.CONTROL, (1 << core.SRESET))
 
 
-PUB sleep_after_int(state=-2): curr_state
+PUB sleep_after_int(s=-2): c
 ' Enable Sleep After Interrupt
 '   Valid values:
 '       TRUE (1 or -1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
-    curr_state := readreg(core.ENABLE)
-    case abs(state)
+    c := readreg(core.ENABLE)
+    case abs(s)
         0, 1:
-            state := abs(state) << core.SAI
+            s := abs(s) << core.SAI
+            s := ((c & core.SAI_MASK) | s) & core.ENABLE_MASK
+            writereg(core.ENABLE, s)
         other:
-            return (((curr_state >> core.SAI) & 1) == 1)
-
-    state := ((curr_state & core.SAI_MASK) | state) & core.ENABLE_MASK
-    writereg(core.ENABLE, state)
+            return (((c >> core.SAI) & 1) == 1)
 
 
 PRI update_cpl()
